@@ -1,9 +1,9 @@
 # The Poker Environment
 import random
-from typing import List
 from turtle import position
+from typing import List
 
-CARD_RANKS = [i for i in range(1, 13)] # Jack = 10, Queen = 11, King = 12, IMPORTANT: Ace = 1
+CARD_RANKS = [i for i in range(2, 14)] # Jack = 10, Queen = 11, King = 12, IMPORTANT: Ace = 13 since we use that for sorting
 CARD_SUITS = ["Spades", "Clubs", "Hearts", "Diamonds"] 
 
 class Card():
@@ -19,7 +19,7 @@ class Card():
 		# Check validity of card TODO: Maybe put into separate function to check wellformedness
 		if self.__suit not in CARD_SUITS: 
 			raise Exception("Invalid Suit: {}".format(self.__suit))
-		if self.__rank < 1 or self.__rank > 12:
+		if self.__rank < 2 or self.__rank > 13:
 			raise Exception("Invalid Rank: {}".format(self.__rank))
 
 	@property
@@ -29,6 +29,9 @@ class Card():
 	@property
 	def suit(self):
 		return self.__suit
+	
+	def print(self):
+		print("  ", self.rank, "of", self.suit)
 
 
 class Deck():
@@ -48,44 +51,10 @@ class Deck():
 		return len(self.__cards)
 
 	def draw(self): # Draw a card from the current deck
-		card_idx = random.randint(0, len(self.__cards) - 1)
-		card = self.__cards.pop(card_idx)
+		card = self.__cards.pop()
 		return card
 		
-
-class Player():
-	def __init__(self, balance) -> None:
-		self.hand: List[Card] = [] # The hand is also known as hole cards: https://en.wikipedia.org/wiki/Texas_hold_%27em
-		self.player_balance = balance # TODO: Important that this value cannot be modified easily...
-		self.current_bet = 0
-		
-		self.playing_current_round = True
-
-	# Wellformedness, hand is always either 0 or 2 cards
-	
-	def add_card_to_hand(self, card: Card):
-		self.hand.append(card)
-		assert(len(self.hand) <= 2)
-	
-	def clear_hand(self):
-		self.hand = []
-	
-	def set_current_bet(self, bet):
-		self.current_bet = bet
-
-	def place_bet(self) -> int:
-
-
-	
-
-	# Options: Check, Bet, Raise, Fold, 
-		
-
-class AIPlayer(Player):
-	def __init__(self) -> None:
-		super().__init__()
-	
-	
+ACTIONS = ["Check", "Bet", "Call", "Fold"]
 
 class PokerEnvironment():
 	def __init__(self) -> None:
@@ -95,7 +64,7 @@ class PokerEnvironment():
 		# Changes every round
 		self.dealer_button_position = 0 # This button will move every round
 		self.pot_balance = 0 # keep track of the current pot size
-		self.community_cards: List[Card] = []
+		self.community_cards: List[Card] = [] # a.k.a. the board
 		self.min_bet_size = 0
 
 		
@@ -105,11 +74,14 @@ class PokerEnvironment():
 		self.big_blind = 100 # TODO: Check if this is even necessary 
 	
 	def add_player(self):
-		self.players.append(Player(balance=self.new_player_balance))
+		self.players.append(Player(self.new_player_balance))
+
+	def add_AI_player(self): # Add a dumb AI
+		self.players.append(AIPlayer(self.new_player_balance))
 	
-	def get_winning_players(self) -> List[Player]:
+	def get_winning_players(self) -> List:
 		# If there is more than one winning player, the pot is split. We assume that we only run things once
-		winning_players: List[Player] = []
+		winning_players: List = []
 		for player in self.players:
 			if player.playing_current_round:
 				winning_players.append(player)
@@ -125,12 +97,11 @@ class PokerEnvironment():
 
 		self.pot_balance = 0 # Reset the pot just to be safe
 
-
-	def get_remaining_players_in_round(self) -> List[Player]:
+	def get_remaining_players_in_round(self) -> List:
 		remaining_players = []
 		for player in self.players:
 			if player.playing_current_round:
-				remaining_players.append(self.players)
+				remaining_players.append(player)
 		return remaining_players
 
 	def count_remaining_players_in_round(self) -> int: 
@@ -140,8 +111,58 @@ class PokerEnvironment():
 			if player.playing_current_round:
 				count += 1
 		return count
+	
+	# # def determine_strongest_hand(self): # Move to a separate function evaluator
+	# 	# Refer to https://www.poker.org/poker-hands-ranking-chart/. 
+	# 	# PRE: This function should only be called after the river has been played
+		
+	# 	# We update by having the players no longer playing the round
+	# 	remaining_players = self.get_remaining_players_in_round()
+	# 	for player in remaining_players:
+	# 		card_combinations: List[Card] = player.hand + self.community_cards
+			
+	# 		# Find best possible 5-card combination
+	# 		ranks = [card.rank for card in card_combinations]
+	# 		suits = [card.suit for card in card_combinations]
+			
+			
+	# 		card_combinations.sort(key=lambda x: x.rank, reverse=True)
+
+	# 		assert(len(ranks) == 7)
+	# 		assert(len(suits) == 7)
+			
+	# 		# This is kind of a pain to code the rules, but this is fun!
+
+	# 		# 1. Royal Flush
+	# 		if True:
+	# 			return
 
 
+	# 		# 2. Straight Flush
+
+		
+	# 		# 3. Four of a kind
+	# 		elif len(ranks) - ranks.distinct() == 1:
+	# 			return 
+	# 		# 4. Full House
+	# 		# 5. Flush
+	# 		# 6. Straight
+	# 		# 7. Three of a Kind
+	# 		# 8. Two Pair
+	# 		# 9. Pair
+	# 		elif len(ranks) - ranks.disctinct() == 1:
+	# 			identical_rank = self.find_identical_values(card_combinations)
+
+	# 		# 10. High Card
+	# 		else:
+	# 			card_combinations = card_combinations[:5] # First 5 cards, since those are the highest cards
+			
+	# 		assert(len(card_combinations) == 5)
+
+	def print_board(self):
+		for card in self.community_cards:
+			card.print()
+		
 	def start_new_round(self):
 		assert(len(self.players) >= 2) # We cannot start a poker round with less than 2 players...
 		# 1. Shuffle, reset pot size 
@@ -153,17 +174,23 @@ class PokerEnvironment():
 		if self.dealer_button_position == len(self.players):
 			self.dealer_button_position = 0
 		
+		# Small Blind
 		if self.dealer_button_position + 1 == len(self.players):
 			self.players[self.dealer_button_position + 1 - len(self.players)].set_current_bet(self.small_blind)
-			
+		else:
+			self.players[self.dealer_button_position + 1].set_current_bet(self.small_blind)
+
+		# Big Blind
 		if self.dealer_button_position + 2 >= len(self.players):
 			self.players[self.dealer_button_position + 2 - len(self.players)].set_current_bet(self.big_blind)
+		else:
+			self.players[self.dealer_button_position + 2].set_current_bet(self.big_blind)
 
 		# 3. Deal Cards
 		# We start dealing with the player directly clockwise of the dealer button
 		position_to_deal = self.dealer_button_position + 1 
 
-		for _ in range(2):# Deal the cards to each player
+		for _ in range(2):# Deal the cards to each player, moving in a clockwise circle twice
 			for _ in range(len(self.players)): 
 				if position_to_deal == len(self.players):
 					position_to_deal = 0 # Start at 0 index again
@@ -171,62 +198,160 @@ class PokerEnvironment():
 				card = self.deck.draw()
 				self.players[position_to_deal].add_card_to_hand(card)
 				
+				position_to_deal += 1
+				
 		
-		# FOR DEBUGGING PURPOSES:
-		for player in self.players:
-			print(player.hand)
+		while True:
+			# FOR DEBUGGING PURPOSES:
+			for idx, player in enumerate(self.players):
+				def print_hand(hand: List[Card]): # Helper function
+					for card in hand:
+						card.print()
 
-		# 2. Preflop bets, start from the person after the big blind
-		# TODO: Consider cases when there are raises
-		self.min_bet_size = self.big_blind
-		for player in self.players:
-			player_bet = player.place_bet()
-			self.min_bet_size = max(player_bet, self.min_bet_size)
-			self.pot_balance += player_bet
-			
-			if player_bet < self.min_bet_size: # You can't bet less than the bet size
-				player.playing_current_round = False
-			
-			
-		if self.count_remaining_players_in_round() == 1:
-			self.distribute_pot_to_winning_players()
-		# 3. Flop
-		self.min_bet_size = 0
-		self.deck.draw() # We must first burn one card
-		for _ in range(3): # Draw 3 cards
-			self.community_cards.append(self.deck.draw())
-			
-		
-		for player in self.get_remaining_players_in_round():
-			self.min_bet_size = max(player_bet, self.min_bet_size)
-			self.pot_balance += player_bet
-			
-			if player_bet < self.min_bet_size: # You can't bet less than the bet size
-				player.playing_current_round = False
-		
-		if self.count_remaining_players_in_round() == 1:
-			self.distribute_pot_to_winning_players()
-			
-		# 4. Turn
-		self.play_turn_or_river()
-		
-		# 5. River
-		self.play_turn_or_river()
-		
-		
-		self.distribute_pot_to_winning_players() # There might be more than 1 winner, so in this case, we split the pot evenly
-		# End of Round
-			
+				print("Player #", idx, "has the following cards:")
+				print_hand(player.hand)
 
-		def play_turn_or_river(self): # To make code more efficient
-			self.deck.draw()# We must first burn one card
-			self.community_cards.append(self.deck.draw())
-			for player in self.get_remaining_players_in_round():
+			# 2. Preflop bets, start from the person after the big blind
+			# TODO: Consider cases when there are raises
+			position_in_play = self.dealer_button_position + 2
+
+			self.min_bet_size = self.big_blind
+
+			for _ in range(len(self.players)):
+				if position_in_play >=  len(self.players):
+					position_in_play -= len(self.players)
+
+				player = self.players[position_in_play]
+				player.update_observed_environment(self)
+				player_bet = player.place_bet()
 				self.min_bet_size = max(player_bet, self.min_bet_size)
 				self.pot_balance += player_bet
 				
 				if player_bet < self.min_bet_size: # You can't bet less than the bet size
 					player.playing_current_round = False
+				
+				position_in_play += 1 # Go to the next player's turn
+				
+			if self.count_remaining_players_in_round() == 1:
+				self.distribute_pot_to_winning_players()
+				break # End round on Pre-Flop
+
+			# 3. Flop
+			self.deck.draw() # We must first burn one card, TODO: Show on video
+			for _ in range(3): # Draw 3 cards
+				self.community_cards.append(self.deck.draw())
+			print("The Flop:")
+			self.print_board()
+
+			self.play_flop_or_turn_or_river() # Let players play
+			if self.count_remaining_players_in_round() == 1:
+				self.distribute_pot_to_winning_players()
+				break # End round on Flop because everyone else folded
+				
+			# 4. Turn
+			self.deck.draw()# We must first burn one card
+			self.community_cards.append(self.deck.draw())
+			self.print_board()
+			
+			self.play_flop_or_turn_or_river()
+
+			if self.count_remaining_players_in_round() == 1:
+				self.distribute_pot_to_winning_players()
+				break # End round on Turn because everyone else folded
+			
+			# 5. River
+			self.deck.draw()# We must first burn one card
+			self.community_cards.append(self.deck.draw())
+			self.print_board()
+
+			self.play_flop_or_turn_or_river()
+
+			if self.count_remaining_players_in_round() == 1:
+				self.distribute_pot_to_winning_players()
+				break # End round on River because everyone else folded
+			
+			# Less than one player folded, so we need to evaluate the hands and distribute
+			
+			# TODO: Evalute
+			self.distribute_pot_to_winning_players() # There might be more than 1 winner, so in this case, we split the pot evenly
+		# End of Round
+			
+
+	def play_flop_or_turn_or_river(self): # To make code more efficient
+		self.min_bet_size = 0 #  the min-bet size is now 0, since players can simply check
+		for player in self.get_remaining_players_in_round():
+			player.update_observed_environment(self)
+			player_bet = player.place_bet()
+			self.min_bet_size = max(player_bet, self.min_bet_size)
+			self.pot_balance += player_bet
+			
+			if player_bet < self.min_bet_size: # You can't bet less than the bet size
+				# This is automatically updated at the player level, but just to be safe
+				player.playing_current_round = False
 		
-		if self.count_remaining_players_in_round() == 1:
-			self.distribute_pot_to_winning_players()
+
+class Player(): # This is the POV
+	def __init__(self, balance) -> None:
+		self.hand: List[Card] = [] # The hand is also known as hole cards: https://en.wikipedia.org/wiki/Texas_hold_%27em
+		self.player_balance = balance # TODO: Important that this value cannot be modified easily...
+		self.current_bet = 0
+		
+		self.playing_current_round = True
+		
+		self.observed_env: PokerEnvironment = None
+
+	# Wellformedness, hand is always either 0 or 2 cards
+	
+	def add_card_to_hand(self, card: Card):
+		self.hand.append(card)
+		assert(len(self.hand) <= 2)
+	
+	def clear_hand(self):
+		self.hand = []
+	
+	def set_current_bet(self, bet: int):
+		self.current_bet = bet
+		self.player_balance -= self.current_bet
+
+	def update_observed_environment(self, env: PokerEnvironment): # Partially observed environment
+		self.observed_env = env
+
+
+	def place_bet(self) -> int:
+		action = input("Choose you action ('Check', 'Bet', 'Call', or 'Fold'):")
+		if action == "Check":
+			if self.observed_env.min_bet_size > 0: 
+				print("You cannot check, since there is a bet. You can either 'Bet' or 'Fold'.")
+				return self.place_bet()
+
+			else:
+				self.set_current_bet(0)
+
+		elif action == "Bet":
+			self.set_current_bet(self.observed_env.big_blind)
+		
+		elif action ==  "Call": # Only Applies to small blind for now, so take away another small blind value
+			self.set_current_bet(self.observed_env.small_blind)
+
+		elif action == "Fold":
+			self.set_current_bet(0)
+			self.playing_current_round = False
+		
+		else:
+			print("Invalid action")
+			return self.place_bet()
+		
+		return self.current_bet
+
+
+
+class AIPlayer(Player):
+	def __init__(self, balance) -> None:
+		super().__init__(balance)
+	
+	def place_bet(self) -> int: # AI will bet every single round
+		self.set_current_bet(self.observed_env.big_blind)
+		
+		return self.current_bet
+	
+	
