@@ -3,24 +3,35 @@ import random
 from turtle import position
 from typing import List
 
-CARD_RANKS = [i for i in range(2, 14)] # Jack = 10, Queen = 11, King = 12, IMPORTANT: Ace = 13 since we use that for sorting
-CARD_SUITS = ["Spades", "Clubs", "Hearts", "Diamonds"] 
+CARD_RANKS = [i for i in range(2, 15)] # Jack = 11, Queen = 12, King = 13, IMPORTANT: Ace = 14 since we use that for sorting
+CARD_SUITS = ["Clubs", "Diamonds", "Hearts","Spades"] 
+
+RANK_KEY = {"A": 14, "2": 2, "3": 3, "4":4, "5":5, "6":6,
+			"7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K":13}
+
+SUIT_KEY = {"C": "Clubs", "D": "Diamonds", "H":"Hearts","S": "Spades"}
 
 class Card():
 	# Immutable after it has been initialized
-	def __init__(self, rank=1, suit="Spades", generate_random=False) -> None:
-		self.__rank = rank
-		self.__suit = suit
+	def __init__(self, rank=1, suit="Spades", rank_suit=None, generate_random=False) -> None:
+
+		if rank_suit: # Ex: "KD" (King of diamonds), "10H" (10 of Hearts),
+			self.__suit = SUIT_KEY[rank_suit[-1]]
+			self.__rank = RANK_KEY[rank_suit[:-1]]
+
+		else:
+			self.__rank = rank
+			self.__suit = suit
 		
 		if generate_random: # If we want to just generate a random card
 			self.__rank = random.choice(CARD_RANKS)
 			self.__suit = random.choice(CARD_SUITS)
 	
 		# Check validity of card TODO: Maybe put into separate function to check wellformedness
+		if self.__rank not in CARD_RANKS:
+			raise Exception("Invalid Rank: {}".format(self.__rank))
 		if self.__suit not in CARD_SUITS: 
 			raise Exception("Invalid Suit: {}".format(self.__suit))
-		if self.__rank < 2 or self.__rank > 13:
-			raise Exception("Invalid Rank: {}".format(self.__rank))
 
 	@property
 	def rank(self):
@@ -32,7 +43,7 @@ class Card():
 	
 	def print(self):
 		print("  ", self.rank, "of", self.suit)
-
+	
 
 class Deck():
 	def __init__(self) -> None: # Create a new full deck
