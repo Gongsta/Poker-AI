@@ -41,7 +41,7 @@ class UnitTests(unittest.TestCase):
 		c = Card(rank_suit="2H")
 		d = Card(rank_suit="2S")
 		hand = [a, b, c, d]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b11110000')
 
 		a = Card(rank_suit="AC")
@@ -49,7 +49,7 @@ class UnitTests(unittest.TestCase):
 		c = Card(rank_suit="AH")
 		d = Card(rank_suit="AS")
 		hand = [a, b, c, d]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b11110000000000000000000000000000000000000000000000001111')
 
 		a = Card(rank_suit="2C")
@@ -57,7 +57,7 @@ class UnitTests(unittest.TestCase):
 		c = Card(rank_suit="4C")
 		d = Card(rank_suit="5C")
 		hand = [a, b, c, d]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b10001000100010000')
 
 		a = Card(rank_suit="AC")
@@ -65,7 +65,7 @@ class UnitTests(unittest.TestCase):
 		c = Card(rank_suit="4S")
 		d = Card(rank_suit="5S")
 		hand = [a, b, c, d]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		
 		final_string = '0b'
 		final_string += '1' 
@@ -83,7 +83,7 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="9S") 
 		g = Card(rank_suit="2C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 1)
 	
@@ -96,7 +96,7 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7S") 
 		g = Card(rank_suit="8S")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 2)
 	
@@ -110,7 +110,7 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="6D") 
 		g = Card(rank_suit="6H")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 3)
 	
@@ -123,7 +123,7 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="AD") 
 		g = Card(rank_suit="AH")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 3)
 	
@@ -136,7 +136,7 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="AD") 
 		g = Card(rank_suit="7H")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 4)
 
@@ -149,7 +149,7 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="8S") 
 		g = Card(rank_suit="7S")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 5)
 
@@ -163,8 +163,8 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
-		hh = evaluator.get_hand_strength(True)
+		evaluator = CombinedHand(hand)
+		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 6)
 
 	def test_three_of_a_kind(self):
@@ -176,8 +176,8 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
-		hh = evaluator.get_hand_strength(True)
+		evaluator = CombinedHand(hand)
+		hh = evaluator.get_hand_strength()
 		self.assertEqual(evaluator.hand_strength, 7)
 	
 	def test_three_of_a_kind(self):
@@ -189,9 +189,48 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = Evaluator(hand)
+		evaluator = CombinedHand(hand)
 		hh = evaluator.get_hand_strength(True)
 		self.assertEqual(evaluator.hand_strength, 7)
+
+	def test_two_pair(self):
+		a = Card(rank_suit="4S")
+		b = Card(rank_suit="4D")
+		c = Card(rank_suit="6H")
+		d = Card(rank_suit="6C")
+		e = Card(rank_suit="10H")
+		f = Card(rank_suit="7C") 
+		g = Card(rank_suit="8C")
+		hand = [a,b,c,d,e,f,g]
+		evaluator = CombinedHand(hand)
+		hh = evaluator.get_hand_strength()
+		self.assertEqual(evaluator.hand_strength, 8)
+
+	def test_pair(self):
+		a = Card(rank_suit="4S")
+		b = Card(rank_suit="4D")
+		c = Card(rank_suit="KH")
+		d = Card(rank_suit="6H")
+		e = Card(rank_suit="10H")
+		f = Card(rank_suit="7C") 
+		g = Card(rank_suit="8C")
+		hand = [a,b,c,d,e,f,g]
+		evaluator = CombinedHand(hand)
+		hh = evaluator.get_hand_strength()
+		self.assertEqual(evaluator.hand_strength, 9)
+
+	def test_high_card(self):
+		a = Card(rank_suit="4S")
+		b = Card(rank_suit="KD")
+		c = Card(rank_suit="2H")
+		d = Card(rank_suit="6H")
+		e = Card(rank_suit="10H")
+		f = Card(rank_suit="7C") 
+		g = Card(rank_suit="8C")
+		hand = [a,b,c,d,e,f,g]
+		evaluator = CombinedHand(hand)
+		hh = evaluator.get_hand_strength()
+		self.assertEqual(evaluator.hand_strength, 10)
 # class IntegrationTests(unittest.TestCase):
 
 # 	def test_environment(self):

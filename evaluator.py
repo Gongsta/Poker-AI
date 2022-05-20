@@ -48,18 +48,21 @@ BIT_MASKS = [BIT_MASK_1, BIT_MASK_2, BIT_MASK_4, BIT_MASK_8]
 """
 CARD_BIT_SUITS_DICT = {1: "Clubs", 2: "Diamonds", 4: "Hearts", 8: "Spades"}
 
-class Evaluator:
+
+class CombinedHand:
 	def __init__(self, hand: List [Card]):
 		self.hand = hand
 		self.hand_strength = 0
 		self.h = 0 
+		self.hh = 0
+		self.kicker = 0
 		for card in hand: # Convert cards into our binary representation
 			self.h += 1 << int(4 * (card.rank - 1)) << CARD_SUITS_DICT[card.suit] # TODO: I can probs optimize by storing the multiplication in another CARDS_RANK_DICT table
 
 			if card.rank == 14: # For aces, we need to add them at the beginning as well
 				self.h += 1 << CARD_SUITS_DICT[card.suit]
 		
-			
+
 
 	def get_binary_representation(self):
 		return bin(self.h)
@@ -68,9 +71,9 @@ class Evaluator:
 		# There is some inconsistency in the return format, so just to be aware here, how it works
 		# The reason I am not returning simply the best hand is because further comparison is needed down the line, for kickers.
 		# Maybe I can just code in the kickers here? Return [Card1, Card2, Card3, Card4, Card5]?
-		# 1
-		# 2
-		# 3
+		# 1 (Royal Flush) - dont care, returns 4-bit
+		# 2 (Straight Flush) - returns 40-bit integer
+		# 3 (Four of A kind) - returns a 49-bit integer, (maybe List + kicker here? Doesn't make it much slower)
 		# 4
 		# 5
 		# 6
@@ -111,8 +114,8 @@ class Evaluator:
 
 		
 		# 4 - Full House
-		threes = self.check_threes() 
-		twos = self.check_twos()
+		threes, threes_hh = self.check_threes() 
+		twos = self.check_twos(threes_hh) # Exclusive pairs, not threes, needed for full house
 		if len(threes) >= 1 and len(twos) >= 1:
 			self.hand_strength = 4
 			return [max(threes), max(twos)] 
@@ -141,16 +144,16 @@ class Evaluator:
 		hh = (hh) & (hh >> 4) & (hh >> 8) & (hh >> 12) & (hh >> 16)
 		
 		if hh:
-			if verbose:
-				low_card = 1
-				n = hh 
-				while True:
-					if (n & 1):
+			low_card = 1
+			n = hh 
+			while True:
+				if (n & 1):
+					if verbose:
 						print("Straight with lowest card: ", low_card)
-						break
-					
-					low_card += 1
-					n = n >> 4
+					break
+				
+				low_card += 1
+				n = n >> 4
 
 			self.hand_strength = 6
 			return low_card
@@ -158,7 +161,7 @@ class Evaluator:
 			
 		# 7 - Three of A Kind
 		# threes = self.check_threes() # This is already ran in the full house
-		if threes:	# Move this for comparison?
+		if len(threes) >= 1:	# Move this for comparison?
 			if verbose:
 				print("Three of a kind: ", threes) #TODO: Check Value
 
@@ -167,7 +170,7 @@ class Evaluator:
 		
 		# 8 - Two Pair / 9 - One Pair
 		# twos = self.check_threes() # This is already ran in the full house
-		if twos:	# Move this for comparison?
+		if len(twos) >= 1:	# Move this for comparison?
 			if verbose:
 				if len(twos) >= 2: # Two Pair
 					print("One Pair: ", twos) #TODO: Check Value
@@ -179,9 +182,11 @@ class Evaluator:
 			else: # One Pair
 				self.hand_strength = 9
 			
+			return twos
+			
 
 		# 10 - High Card
-		self.get_hand_strength = 10
+		self.hand_strength = 10
 		return self.h # Just return the original self.h
 		
 
@@ -203,11 +208,12 @@ class Evaluator:
 				n = n >> 4
 			
 		# No Guarantee that hh only has 1 bit, but the bit will always be on every 4th
-		return threes
+		return threes, hh
 
-	def check_twos(self):
+	def check_twos(self, threes_hh):
 		h = self.h >> 4 # Ignore right most aces
 		hh = (((h) & (h >> 1)) | ((h) & (h >> 2)) | ((h) & (h >> 3)) | ((h >> 1) & (h >> 2)) | ((h >> 1) & (h >> 3)) | ((h >> 2) & (h >> 3))) & BIT_MASK_1
+		hh = hh ^ threes_hh
 		twos = []
 		if hh:
 			low_card = 2
@@ -222,3 +228,39 @@ class Evaluator:
 				n = n >> 4
 			
 		return twos
+	
+	
+
+class Evaluator:
+	def __init__(self):
+		self.hands: List[CombinedHand] = None
+	
+	def add_hand(self, combined_hand: CombinedHand):
+		self.hands.append(combined_hand)
+	
+	def get_winner(self): # Return a list of index of players who won the pot. If multiple, then split
+		for hand in self.hands:
+			hand.get_hand_strength()
+		hand_strengths = [hand.hand_strength for hand in self.hands]
+		best_hand_val = min(hand_strengths)
+		potential_winners = [i for i, x in enumerate(hand_strengths) if x == best_hand_val]
+		
+		if len(potential_winners) > 1: # Potential ties
+			if best_hand_val == 1: # Royal Flush, Automatic Tie
+				return potential_winners
+
+			elif best_hand_val == 2: # Straight Flush, check low card
+
+			elif best_hand_val == 3:
+			elif best_hand_val == 2:
+			elif best_hand_val == 2:
+			elif best_hand_val == 2:
+			elif best_hand_val == 2:
+			elif best_hand_val == 2:
+
+			for i in potential_winners:
+				return 0
+			
+		else: # Single person has the best hand
+			return potential_winners
+		
