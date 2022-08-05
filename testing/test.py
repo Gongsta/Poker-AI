@@ -136,14 +136,17 @@ class UnitTests(unittest.TestCase):
 		g = Card(rank_suit="8S")
 		h = Card(rank_suit="9S")
 		hand1 = [a,b,c,d,e,f,g]
-		hand2 = [h,b,c,d,e,f,g]
+		hand2 = [a,b,h,d,e,f,g]
 		hand3 = [a,b,c,d,e,f,g]
 		hand1 = CombinedHand(hand1)
 		hand2 = CombinedHand(hand2)
+		hand3 = CombinedHand(hand3)
 		hand1.get_hand_strength()
 		hand2.get_hand_strength()
 		self.assertEqual(hand1.hand_strength, 2)
 		self.assertEqual(hand2.hand_strength, 2)
+		self.assertEqual(hand1.comparator, [4]) 
+		self.assertEqual(hand2.comparator, [5]) 
 
 		# No tie, since hand2 has a better straight flush
 		evaluator = Evaluator()
@@ -151,7 +154,7 @@ class UnitTests(unittest.TestCase):
 		evaluator.add_hands(hand2)
 		self.assertEqual(evaluator.get_winner(), [1])
 		
-		# Tie, since both hands have the same straight flush
+		# Tie, since both hand1 and hand2 have the same straight flush
 		evaluator.clear_hands()
 		evaluator.add_hands(hand1)
 		evaluator.add_hands(hand3)
@@ -169,6 +172,7 @@ class UnitTests(unittest.TestCase):
 		hand1 = CombinedHand(hand1)
 		hand1.get_hand_strength()
 		self.assertEqual(hand1.hand_strength, 3)
+		self.assertEqual(hand1.comparator, [6, 11]) # Four cards of six + Jack Kicker
 	
 		# Check for ties
 		a = Card(rank_suit="4S")
@@ -206,6 +210,7 @@ class UnitTests(unittest.TestCase):
 		hand1 = CombinedHand(hand1)
 		hand1.get_hand_strength()
 		self.assertEqual(hand1.hand_strength, 4)
+		self.assertEqual(hand1.comparator, [4, 2]) # Three cards of 4s + Pair of Twos
 		
 		
 		# Better Pair of threes (10s vs 4s)
@@ -260,13 +265,14 @@ class UnitTests(unittest.TestCase):
 		hand1 = CombinedHand(hand1)
 		hand1.get_hand_strength()
 		self.assertEqual(hand1.hand_strength, 5)
+		self.assertEqual(hand1.comparator, [14,11,8,7,4])
 		
 		b = Card(rank_suit="3S") # Worse flush
 		hand2 = [a,b,c,d,e,f,g]
+		hand2 = CombinedHand(hand2)
 		evaluator = Evaluator()
 		evaluator.add_hands(hand1, hand2)
 		self.assertEqual(evaluator.get_winner(), [0])
-
 
 	def test_straight(self):
 		a = Card(rank_suit="4S")
@@ -276,6 +282,7 @@ class UnitTests(unittest.TestCase):
 		e = Card(rank_suit="10H")
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
+		h = Card(rank_suit="9C")
 		hand = [a,b,c,d,e,f,g]
 		hand = CombinedHand(hand)
 		hand.get_hand_strength()
@@ -287,7 +294,12 @@ class UnitTests(unittest.TestCase):
 		evaluator.add_hands(hand, hand2)
 		self.assertEqual(evaluator.get_winner(), [0,1])
 
+		# Better Straight
 		evaluator.clear_hands()
+		hand3 = [a,b,c,d,e,f,g,h]
+		hand3 = CombinedHand(hand3)
+		evaluator.add_hands(hand, hand3)
+		self.assertEqual(evaluator.get_winner(), [1])
 
 
 	def test_three_of_a_kind(self):
@@ -299,23 +311,46 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = CombinedHand(hand)
-		evaluator.get_hand_strength()
-		self.assertEqual(evaluator.hand_strength, 7)
-	
-	def test_three_of_a_kind(self):
-		a = Card(rank_suit="4S")
-		b = Card(rank_suit="4D")
-		c = Card(rank_suit="4H")
-		d = Card(rank_suit="6H")
-		e = Card(rank_suit="10H")
-		f = Card(rank_suit="7C") 
-		g = Card(rank_suit="8C")
-		hand = [a,b,c,d,e,f,g]
-		evaluator = CombinedHand(hand)
-		hh = evaluator.get_hand_strength(True)
-		self.assertEqual(evaluator.hand_strength, 7)
+		hand = CombinedHand(hand)
+		hand.get_hand_strength()
+		self.assertEqual(hand.hand_strength, 7)
+		self.assertEqual(hand.comparator, [4,10,8])
+		
+		evaluator = Evaluator()
+		# Case #1: Better pair of threes
+		a = Card(rank_suit="5S")
+		b = Card(rank_suit="5D")
+		c = Card(rank_suit="5H")
+		hand2 = [a,b,c,d,e,f,g]
+		hand2 = CombinedHand(hand2)
+		
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [1])
+		
+		# Case #2 Same pair of threes, better kicker1 (Ace vs 10)
+		evaluator.clear_hands()
+		e = Card(rank_suit="AC")
+		hand3 = [a,b,c,d,e,f,g]
+		hand3 = CombinedHand(hand3)
+		evaluator.add_hands(hand2, hand3)
+		self.assertEqual(evaluator.get_winner(), [1])
+		
+		# Case #3: Same pair of threes, same kicker1, better kicker2
+		evaluator.clear_hands()
+		g = Card(rank_suit="9C")
+		hand2 = [a,b,c,d,e,f,g]
+		hand2 = CombinedHand(hand2)
+		evaluator.add_hands(hand2, hand3)
+		self.assertEqual(evaluator.get_winner(), [0])
 
+		# Case #3: Same everything, time
+		f = Card(rank_suit="2D")
+		hand = [a,b,c,d,e,f,g]
+		hand = CombinedHand(hand)
+		evaluator.clear_hands()
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [0,1])
+		
 	def test_two_pair(self):
 		a = Card(rank_suit="4S")
 		b = Card(rank_suit="4D")
@@ -325,9 +360,32 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = CombinedHand(hand)
-		hh = evaluator.get_hand_strength()
-		self.assertEqual(evaluator.hand_strength, 8)
+		hand = CombinedHand(hand)
+		hand.get_hand_strength()
+		self.assertEqual(hand.hand_strength, 8)
+		self.assertEqual(hand.comparator, [6,4,10])
+		
+		# Case #1: Better Top Pair
+		evaluator = Evaluator()
+		a = Card(rank_suit="KS")
+		b = Card(rank_suit="KD")
+		hand2 = [a,b,c,d,e,f,g]
+		hand2 = CombinedHand(hand2)
+		hand2.get_hand_strength()
+		self.assertEqual(hand2.comparator, [13, 6, 10])
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [1])
+		
+		# Case #2: Better Kicker
+		e = Card(rank_suit="JH")
+		hand3 = [a,b,c,d,e,f,g]
+		hand3 = CombinedHand(hand3)
+		hand3.get_hand_strength()
+		self.assertEqual(hand3.comparator, [13, 6, 11])
+		evaluator.clear_hands()
+		evaluator.add_hands(hand2, hand3)
+		self.assertEqual(evaluator.get_winner(), [1])
+
 
 	def test_pair(self):
 		a = Card(rank_suit="4S")
@@ -338,9 +396,34 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = CombinedHand(hand)
-		hh = evaluator.get_hand_strength()
-		self.assertEqual(evaluator.hand_strength, 9)
+		hand = CombinedHand(hand)
+		hand.get_hand_strength()
+		self.assertEqual(hand.hand_strength, 9)
+		self.assertEqual(hand.comparator, [4,13,10,8])
+		
+		# Case #1: Better Top Pair
+		a = Card(rank_suit="QS")
+		b = Card(rank_suit="QD")
+		hand2 = [a,b,c,d,e,f,g]
+		hand2 = CombinedHand(hand2)
+		hand2.get_hand_strength()
+		self.assertEqual(hand2.comparator, [12,13,10,8])
+
+		evaluator = Evaluator()
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [1])
+		
+		# Case #2: Better Kicker #2
+		e = Card(rank_suit="JH")
+		hand3 = [a,b,c,d,e,f,g]
+		hand3 = CombinedHand(hand3)
+		hand3.get_hand_strength()
+		self.assertEqual(hand3.comparator, [12,13,11,8])
+
+		evaluator.clear_hands()
+		evaluator.add_hands(hand3, hand2)
+		self.assertEqual(evaluator.get_winner(), [0])
+		
 
 	def test_high_card(self):
 		a = Card(rank_suit="4S")
@@ -351,9 +434,9 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		combined_hand = CombinedHand(hand)
-		hh = combined_hand.get_hand_strength()
-		self.assertEqual(combined_hand.hand_strength, 10)
+		hand = CombinedHand(hand)
+		hand.get_hand_strength()
+		self.assertEqual(hand.hand_strength, 10)
 	
 
 # class IntegrationTests(unittest.TestCase):
