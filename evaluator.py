@@ -28,7 +28,6 @@ policy. If the game is slow, then there is no point.
 
 # Representation is key to performance. This is going to be terrifying, as I am going to be working with bits..
 from environment import *
-import numpy as np
 import math
 from table import generate_table
 
