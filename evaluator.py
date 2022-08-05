@@ -51,11 +51,10 @@ CARD_BIT_SUITS_DICT = {1: "Clubs", 2: "Diamonds", 4: "Hearts", 8: "Spades"}
 
 class CombinedHand:
 	def __init__(self, hand: List [Card]):
-		self.hand = hand
+		self.hand: List[Card] = hand
 		self.hand_strength = 0
 		self.h = 0 
-		self.hh = 0
-		self.kicker = 0
+		self.comparator = 0
 		for card in hand: # Convert cards into our binary representation
 			self.h += 1 << int(4 * (card.rank - 1)) << CARD_SUITS_DICT[card.suit] # TODO: I can probs optimize by storing the multiplication in another CARDS_RANK_DICT table
 
@@ -68,16 +67,14 @@ class CombinedHand:
 		return bin(self.h)
 	
 	def get_hand_strength(self, verbose=False):
-		# There is some inconsistency in the return format, so just to be aware here, how it works
-		# The reason I am not returning simply the best hand is because further comparison is needed down the line, for kickers.
-		# Maybe I can just code in the kickers here? Return [Card1, Card2, Card3, Card4, Card5]?
-		# 1 (Royal Flush) - dont care, returns 4-bit
-		# 2 (Straight Flush) - returns 40-bit integer
-		# 3 (Four of A kind) - returns a 49-bit integer, (maybe List + kicker here? Doesn't make it much slower)
-		# 4
-		# 5
-		# 6
-		# 7
+		# In case of ties, we set self.comparator:
+		# 1 (Royal Flush) - Always Tie
+		# 2 (Straight Flush) - Set self.comparator = lowest_straight_flush 
+		# 3 (Four of A kind) - Set self.comparator = [four_of_a_kind, kicker]
+		# 4 (Full House) - set self.comparator =  [three_of_a_kind, two_of_a_kind]
+		# 5 (Flush) - self.comparator = [flush1, flush2, flush3, flush4, flush5]
+		# 6 (Straight) - self.comparator = lowest_straight
+		# 7 (Three of a kind) - self.comparator = [three_of_a_kind, kicker1, kicker2]
 		# 8 (Two-Pair) - Returns [Rank1, Rank2]
 		# 9 (Pair) - Returns [Rank]
 		# 10 (Pair) - Returns 56-bit		
@@ -99,18 +96,25 @@ class CombinedHand:
 			if verbose:
 				print("Straight Flush starting with the lowest card of",  ) # TODO
 			self.hand_strength = 2
-			return hh 
+			self.comparator = hh
+			return
 			# If TIE, you can just use hh to compare
 		
 		# 3 - Four of A Kind
 		h = self.h >> 4 # Ignore the first 4 aces
 		hh = (h) & (h >> 1) & (h >> 2) & (h >> 3) & BIT_MASK_1
 		if hh:
+			four_of_a_kind = BIT_POSITION_TABLE[hh]//4 + 2
 			if verbose:
-				print("Four of a kind: ", BIT_POSITION_TABLE[hh]//4 + 2)  # hh is guaranteed to only have a single "1" bit
+				print("Four of a kind: ", four_of_a_kind)  # hh is guaranteed to only have a single "1" bit
 			self.hand_strength = 3
-			return hh
-			# TODO: If TIE, you need to use `self.h` and find the kicker...
+			kicker = 0
+			for card in self.hand:
+				if (card.rank != four_of_a_kind):
+					kicker = max(kicker, card.rank)
+			
+			self.comparator = [four_of_a_kind,kicker]
+			return
 
 		
 		# 4 - Full House
@@ -118,7 +122,8 @@ class CombinedHand:
 		twos = self.check_twos(threes_hh) # Exclusive pairs, not threes, needed for full house
 		if len(threes) >= 1 and len(twos) >= 1:
 			self.hand_strength = 4
-			return [max(threes), max(twos)] 
+			self.comparator = [max(threes), max(twos)]
+			return
 
 		# 5 - Flush
 		h = self.h >> 4 # Ignore the right most aces
@@ -127,8 +132,9 @@ class CombinedHand:
 			if bin(hh).count("1") >= 5:
 				# print("Flush with hand: ", bin(hh)) #TODO: Get the card values
 				self.hand_strength = 5
-				return hh
-				# TODO: If tie, you can just use hh, finding the value of the cards
+
+				self.comparator = hh
+				return
 
 		# 6 - Straight
 		h = self.h
@@ -156,6 +162,7 @@ class CombinedHand:
 				n = n >> 4
 
 			self.hand_strength = 6
+			self.comparator = low_card
 			return low_card
 			
 			
@@ -166,6 +173,7 @@ class CombinedHand:
 				print("Three of a kind: ", threes) #TODO: Check Value
 
 			self.hand_strength = 7
+			self.comparator = h # You will need to check the other high cards
 			return threes
 		
 		# 8 - Two Pair / 9 - One Pair
@@ -182,11 +190,13 @@ class CombinedHand:
 			else: # One Pair
 				self.hand_strength = 9
 			
+			self.comparator = h
 			return twos
 			
 
 		# 10 - High Card
 		self.hand_strength = 10
+		self.comparator = h
 		return self.h # Just return the original self.h
 		
 
@@ -235,10 +245,14 @@ class Evaluator:
 	def __init__(self):
 		self.hands: List[CombinedHand] = None
 	
-	def add_hand(self, combined_hand: CombinedHand):
-		self.hands.append(combined_hand)
+	def add_hands(*combined_hands: CombinedHand):
+		for combined_hand in combined_hands:
+			self.hands.append(combined_hand)
 	
-	def get_winner(self): # Return a list of index of players who won the pot. If multiple, then split
+	def clear_hands():
+		self.hands = []
+	
+	def get_winner(self) -> List[int]: # Return a list of 0-indexed of players who won the pot. If multiple, then split
 		for hand in self.hands:
 			hand.get_hand_strength()
 		hand_strengths = [hand.hand_strength for hand in self.hands]
