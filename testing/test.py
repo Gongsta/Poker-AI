@@ -277,9 +277,18 @@ class UnitTests(unittest.TestCase):
 		f = Card(rank_suit="7C") 
 		g = Card(rank_suit="8C")
 		hand = [a,b,c,d,e,f,g]
-		evaluator = CombinedHand(hand)
-		evaluator.get_hand_strength()
-		self.assertEqual(evaluator.hand_strength, 6)
+		hand = CombinedHand(hand)
+		hand.get_hand_strength()
+		self.assertEqual(hand.hand_strength, 6)
+
+		# Same Straight
+		hand2 = hand
+		evaluator = Evaluator()
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [0,1])
+
+		evaluator.clear_hands()
+
 
 	def test_three_of_a_kind(self):
 		a = Card(rank_suit="4S")

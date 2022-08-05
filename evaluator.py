@@ -72,13 +72,13 @@ class CombinedHand:
 		# 1 (Royal Flush) - Always Tie
 		# 2 (Straight Flush) - Set self.comparator = lowest_straight_flush 
 		# 3 (Four of A kind) - Set self.comparator = [four_of_a_kind, kicker]
-		# 4 (Full House) - set self.comparator =  [three_of_a_kind, two_of_a_kind]
+		# 4 (Full House) - self.comparator =  [three_of_a_kind, two_of_a_kind]
 		# 5 (Flush) - self.comparator = [flush1, flush2, flush3, flush4, flush5]
 		# 6 (Straight) - self.comparator = lowest_straight
 		# 7 (Three of a kind) - self.comparator = [three_of_a_kind, kicker1, kicker2]
-		# 8 (Two-Pair) - Returns [Rank1, Rank2]
-		# 9 (Pair) - Returns [Rank]
-		# 10 (Pair) - Returns 56-bit		
+		# 8 (Two-Pair) - self.comparator= [Rank1, Rank2, kicker]
+		# 9 (Pair) - self.comparator = [pair, kicker1, kicker2, kicker3]
+		# 10 (High Card) - self.comparator = [kicker1, kicker2, kicker3, kicker4, kicker5]
 
 		# 1 - Royal Flush
 		h = self.h
@@ -145,7 +145,7 @@ class CombinedHand:
 					if (card.suit == suit):
 						final_hand.append(card.rank)
 				
-				final_hand = sorted(final_hand)[:5]
+				final_hand = sorted(final_hand, reverse=True)[:5] # Sort from best to worst
 				print("Flush with hand: ",final_hand) 
 				self.hand_strength = 5
 
@@ -195,6 +195,7 @@ class CombinedHand:
 		# 8 - Two Pair / 9 - One Pair
 		# twos = self.check_threes() # This is already ran in the full house
 		if len(twos) >= 1:	# Move this for comparison?
+			twos.sort(reverse=True)
 			if len(twos) >= 2: # Two Pair
 				self.hand_strength = 8
 				kicker = 0
@@ -203,7 +204,7 @@ class CombinedHand:
 						kicker = max(kicker, card.rank)
 				self.comparator = [twos[0], twos[1], kicker]
 				if verbose:
-					print("One Pair: ", twos, "Kicker: ", kicker) #TODO: Check Value
+					print("Two Pair: ", self.comparator[0], ", ", self.comparator[1],  "Kicker: ", self.comparator[2]) #TODO: Check Value
 			else: # One Pair
 				self.hand_strength = 9
 				kickers = []
@@ -212,7 +213,7 @@ class CombinedHand:
 						kickers.append(card.rank)
 				self.comparator = [twos[0], sorted(kickers)[:3]]
 				if verbose:
-					print("One Pair: ", twos, "Kickers: ", kickers) #TODO: Check Value
+					print("One Pair: ", self.comparator[0], "Kickers: ", self.comparator[1]) #TODO: Check Value
 
 			return
 			
@@ -222,7 +223,7 @@ class CombinedHand:
 		kickers = []
 		for card in self.hand:
 				kickers.append(card.rank)
-		self.comparator = sorted(kickers)[:5]
+		self.comparator = sorted(kickers, reverse=True)[:5] # From best to worst ranks
 		if verbose:
 			print("High Card: " self.comparator[-1], "Kickers: ", self.comparator[:4])
 		return
@@ -335,16 +336,18 @@ class Evaluator:
 			elif best_hand_val == 5: # Flush
 				best_flush = [0,0,0,0,0]
 				
-				# This iS WRONG, there is potentially no winners
-				# You need to check that only one person has the best card, 2nd card, etc..
-				for winner in potential_winners:
-					for i in range(5):
+				# Check from best card to worst card. 
+				for i in range(5):
+					for winner in potential_winners:
 						best_flush[i] = max(best_flush[i], self.hands[winner].comparator[i])
-				
-				winners = []
-				for winner in potential_winners:
-					if (self.hands[winner].comparator == best_flush):
-						winners.append(winner)
+
+					winners = []
+					for winner in potential_winners:
+						if (self.hands[winner].comparator[i] == best_flush[i]):
+							winners.append(winner)
+
+					if (len(winners) == 1):  #  Whenever there is only 1 winner, just return
+						return winners
 				
 				return winners
 
@@ -361,23 +364,60 @@ class Evaluator:
 				return winners
 				
 			elif best_hand_val == 7: # Three of a kind
-				highest_low_card = 0
-				for winner in potential_winners:
-					highest_low_card = max(highest_low_card, self.hands[winner].comparator[0])
-				
-				winners = []
-				for winner in potential_winners:
-					if (highest_low_card == self.hands[winner].comparator[0]):
-						winners.append(winner)
+				best_hand = [0,0,0] # [three_of_a_kind, kicker1, kicker2]
+				for i in range(3):
+					for winner in potential_winners:
+						best_hand[i] = max(best_hand[i], self.hands[winner].comparator[i])
 						
-				return winners
+					winners = []
+					for winner in potential_winners:
+						if (self.hands[winner].comparator[i] == best_hand[i]): winners.append(winner)
+					if len(winners) == 1:
+						return winners
+				
+				return winners # In case of tie, this will be run
+
 			elif best_hand_val == 8: # Two Pair
 				best_hand = [0,0,0] # [best_pair1, best_pair2, kicker]
+				for i in range(3):
+					for winner in potential_winners:
+						best_hand[i] = max(best_hand[i], self.hands[winner].comparator[i])
+						
+					winners = []
+					for winner in potential_winners:
+						if (self.hands[winner].comparator[i] == best_hand[i]): winners.append(winner)
+					if len(winners) == 1:
+						return winners
+				
+				return winners # In case of tie, this will be run
+					
 			elif best_hand_val == 9: # One Pair
+				best_hand = [0,0,0,0] # [pair, kicker1, kicker2, kicker3]
+				for i in range(4):
+					for winner in potential_winners:
+						best_hand[i] = max(best_hand[i], self.hands[winner].comparator[i])
+						
+					winners = []
+					for winner in potential_winners:
+						if (self.hands[winner].comparator[i] == best_hand[i]): winners.append(winner)
+					if len(winners) == 1:
+						return winners
+				
+				return winners # In case of time, this will be run
 			elif best_hand_val == 10: # High Card
+				best_hand = [0,0,0,0,0] # [kicker1, kicker2, kicker3, kicker4, kicker5]
+				for i in range(5):
+					for winner in potential_winners:
+						best_hand[i] = max(best_hand[i], self.hands[winner].comparator[i])
+						
+					winners = []
+					for winner in potential_winners:
+						if (self.hands[winner].comparator[i] == best_hand[i]): winners.append(winner)
+					if len(winners) == 1:
+						return winners
 
-			for i in potential_winners:
-				return 0
+				return winners
+
 			
 		else: # Single person has the best hand
 			return potential_winners
