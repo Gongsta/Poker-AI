@@ -139,36 +139,6 @@ class PokerEnvironment():
 			
 	# 		card_combinations.sort(key=lambda x: x.rank, reverse=True)
 
-	# 		assert(len(ranks) == 7)
-	# 		assert(len(suits) == 7)
-			
-	# 		# This is kind of a pain to code the rules, but this is fun!
-
-	# 		# 1. Royal Flush
-	# 		if True:
-	# 			return
-
-
-	# 		# 2. Straight Flush
-
-		
-	# 		# 3. Four of a kind
-	# 		elif len(ranks) - ranks.distinct() == 1:
-	# 			return 
-	# 		# 4. Full House
-	# 		# 5. Flush
-	# 		# 6. Straight
-	# 		# 7. Three of a Kind
-	# 		# 8. Two Pair
-	# 		# 9. Pair
-	# 		elif len(ranks) - ranks.disctinct() == 1:
-	# 			identical_rank = self.find_identical_values(card_combinations)
-
-	# 		# 10. High Card
-	# 		else:
-	# 			card_combinations = card_combinations[:5] # First 5 cards, since those are the highest cards
-			
-	# 		assert(len(card_combinations) == 5)
 
 	def print_board(self):
 		for card in self.community_cards:

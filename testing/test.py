@@ -187,7 +187,6 @@ class UnitTests(unittest.TestCase):
 		evaluator.add_hands(hand1)
 		evaluator.add_hands(hand2)
 		self.assertEqual(evaluator.get_winner(), [1])
-		
 
 		evaluator.clear_hands()
 		# Case for tie
@@ -234,7 +233,21 @@ class UnitTests(unittest.TestCase):
 		evaluator.clear_hands()
 		evaluator.add_hands(hand3, hand3)
 		self.assertEqual(evaluator.get_winner(), [0, 1])
-
+		
+		
+		# Edge Case: Two pairs of threes should still give full house
+		a = Card(rank_suit="4S")
+		b = Card(rank_suit="4C")
+		c = Card(rank_suit="4H")
+		d = Card(rank_suit="2S")
+		e = Card(rank_suit="2H")
+		f = Card(rank_suit="2D") 
+		g = Card(rank_suit="7H")
+		hand1 = [a,b,c,d,e,f,g]
+		hand1 = CombinedHand(hand1)
+		hand1.get_hand_strength()
+		self.assertEqual(hand1.hand_strength, 4)
+		
 	def test_flush(self):
 		a = Card(rank_suit="4S")
 		b = Card(rank_suit="AS")
@@ -243,10 +256,16 @@ class UnitTests(unittest.TestCase):
 		e = Card(rank_suit="10H")
 		f = Card(rank_suit="8S") 
 		g = Card(rank_suit="7S")
-		hand = [a,b,c,d,e,f,g]
-		evaluator = CombinedHand(hand)
-		evaluator.get_hand_strength()
-		self.assertEqual(evaluator.hand_strength, 5)
+		hand1 = [a,b,c,d,e,f,g]
+		hand1 = CombinedHand(hand1)
+		hand1.get_hand_strength()
+		self.assertEqual(hand1.hand_strength, 5)
+		
+		b = Card(rank_suit="3S") # Worse flush
+		hand2 = [a,b,c,d,e,f,g]
+		evaluator = Evaluator()
+		evaluator.add_hands(hand1, hand2)
+		self.assertEqual(evaluator.get_winner(), [0])
 
 
 	def test_straight(self):
