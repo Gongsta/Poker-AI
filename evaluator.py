@@ -64,7 +64,6 @@ class CombinedHand:
 				self.h += 1 << CARD_SUITS_DICT[card.suit]
 		
 
-
 	def get_binary_representation(self):
 		return bin(self.h)
 	
@@ -102,10 +101,10 @@ class CombinedHand:
 					highest_low_card = i
 				checker = checker >> 4
 
-			if verbose:
-				print("Straight Flush starting with the highest low card of",  highest_low_card) 
 			self.hand_strength = 2
 			self.comparator = [highest_low_card]
+			if verbose:
+				print("Straight Flush starting with :",  self.comparator[0]) 
 			return
 			# If TIE, you can just use hh to compare
 		
@@ -114,8 +113,6 @@ class CombinedHand:
 		hh = (h) & (h >> 1) & (h >> 2) & (h >> 3) & BIT_MASK_1
 		if hh:
 			four_of_a_kind = BIT_POSITION_TABLE[hh]//4 + 2
-			if verbose:
-				print("Four of a kind: ", four_of_a_kind)  # hh is guaranteed to only have a single "1" bit
 			self.hand_strength = 3
 			kicker = 0
 			for card in self.hand:
@@ -123,6 +120,8 @@ class CombinedHand:
 					kicker = max(kicker, card.rank)
 			
 			self.comparator = [four_of_a_kind,kicker]
+			if verbose:
+				print("Four of a kind: ", self.comparator[0], "Kicker: ", self.comparator[1])  # hh is guaranteed to only have a single "1" bit
 			return
 
 		
@@ -147,6 +146,9 @@ class CombinedHand:
 
 			else: # Regular Case
 				self.comparator = [max(threes), max(twos)]
+			
+			if verbose:
+				print("Full house with threes of: {}, pair of: {}".format(self.comparator[0], self.comparator[1]))
 			return
 
 		# 5 - Flush
@@ -161,10 +163,11 @@ class CombinedHand:
 						final_hand.append(card.rank)
 				
 				final_hand = sorted(final_hand, reverse=True)[:5] # Sort from best to worst
-				print("Flush with hand: ",final_hand) 
 				self.hand_strength = 5
 
 				self.comparator = final_hand
+				if verbose:
+					print("Flush with hand: ",self.comparator) 
 				return
 
 		# 6 - Straight
@@ -186,8 +189,6 @@ class CombinedHand:
 			n = hh 
 			while (curr < 15):
 				if (n & 1):
-					if verbose:
-						print("Straight with lowest card: ", low_card)
 					low_card = curr
 				
 				curr += 1
@@ -195,6 +196,8 @@ class CombinedHand:
 
 			self.hand_strength = 6
 			self.comparator = [low_card]
+			if verbose:
+				print("Straight starting from: ", self.comparator[0])
 			return low_card
 			
 			

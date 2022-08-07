@@ -303,6 +303,19 @@ class UnitTests(unittest.TestCase):
 
 
 	def test_three_of_a_kind(self):
+		a = Card(rank_suit="10S")
+		b = Card(rank_suit="10H")
+		c = Card(rank_suit="10D")
+		d = Card(rank_suit="6H")
+		e = Card(rank_suit="AH")
+		f = Card(rank_suit="7C") 
+		g = Card(rank_suit="8C")
+		hand = [a,b,c,d,e,f,g]
+		hand = CombinedHand(hand)
+		hand.get_hand_strength()
+		self.assertEqual(hand.hand_strength, 7)
+		self.assertEqual(hand.comparator, [10,14,8])
+
 		a = Card(rank_suit="4S")
 		b = Card(rank_suit="4D")
 		c = Card(rank_suit="4H")
@@ -437,7 +450,33 @@ class UnitTests(unittest.TestCase):
 		hand = CombinedHand(hand)
 		hand.get_hand_strength()
 		self.assertEqual(hand.hand_strength, 10)
+		self.assertEqual(hand.comparator, [13,10,8,7,6])
+
+		b = Card(rank_suit="AD")
+		hand2 = [a,b,c,d,e,f,g]
+		hand2 = CombinedHand(hand2)
+		hand2.get_hand_strength()
+		self.assertEqual(hand2.hand_strength, 10)
+		self.assertEqual(hand2.comparator, [14,10,8,7,6])
+		
+		# Case #1: Better High Card
+		evaluator = Evaluator()
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [1])
+		
+		# Case #2: Better Second High Card
+		e = Card(rank_suit="JH")
+		hand = [a,b,c,d,e,f,g]
+		hand = CombinedHand(hand)
+		evaluator.clear_hands()
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [0])
 	
+		# Case #3: Tie
+		hand2 = hand
+		evaluator.clear_hands()
+		evaluator.add_hands(hand, hand2)
+		self.assertEqual(evaluator.get_winner(), [0,1])
 
 # class IntegrationTests(unittest.TestCase):
 
