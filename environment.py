@@ -1,6 +1,5 @@
 # The Poker Environment
 import random
-from turtle import position
 from typing import List
 
 CARD_RANKS = [i for i in range(2, 15)] # Jack = 11, Queen = 12, King = 13, IMPORTANT: Ace = 14 since we use that for sorting
