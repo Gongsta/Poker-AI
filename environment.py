@@ -66,6 +66,72 @@ class Deck():
 		
 ACTIONS = ["Check", "Bet", "Call", "Fold"]
 
+class Player(): # This is the POV
+	def __init__(self, balance) -> None:
+		self.hand: List[Card] = [] # The hand is also known as hole cards: https://en.wikipedia.org/wiki/Texas_hold_%27em
+		self.player_balance = balance # TODO: Important that this value cannot be modified easily...
+		self.current_bet = 0
+		
+		self.playing_current_round = True
+		
+		self.observed_env: PokerEnvironment = None
+
+	# Wellformedness, hand is always either 0 or 2 cards
+	
+	def add_card_to_hand(self, card: Card):
+		self.hand.append(card)
+		assert(len(self.hand) <= 2)
+	
+	def clear_hand(self):
+		self.hand = []
+	
+	def set_current_bet(self, bet: int):
+		self.current_bet = bet
+		self.player_balance -= self.current_bet
+
+	# def update_observed_environment(self, env: PokerEnvironment): # Partially observed environment
+	# 	self.observed_env = env
+
+
+	def place_bet(self) -> int:
+		action = input("Choose you action ('Check', 'Bet', 'Call', or 'Fold'):")
+		if action == "Check":
+			if self.observed_env.min_bet_size > 0: 
+				print("You cannot check, since there is a bet. You can either 'Bet' or 'Fold'.")
+				return self.place_bet()
+
+			else:
+				self.set_current_bet(0)
+
+		elif action == "Bet":
+			self.set_current_bet(self.observed_env.big_blind)
+		
+		elif action ==  "Call": # Only Applies to small blind for now, so take away another small blind value
+			self.set_current_bet(self.observed_env.small_blind)
+
+		elif action == "Fold":
+			self.set_current_bet(0)
+			self.playing_current_round = False
+		
+		else:
+			print("Invalid action")
+			return self.place_bet()
+		
+		return self.current_bet
+
+
+
+class AIPlayer(Player):
+	def __init__(self, balance) -> None:
+		super().__init__(balance)
+	
+	def place_bet(self) -> int: # AI will bet every single round
+		self.set_current_bet(self.observed_env.big_blind)
+		
+		return self.current_bet
+	
+	
+
 class PokerEnvironment():
 	def __init__(self) -> None:
 		self.players: List[Player] = []
@@ -85,6 +151,9 @@ class PokerEnvironment():
 	
 	def add_player(self):
 		self.players.append(Player(self.new_player_balance))
+
+	def get_player(self, idx) -> Player:
+		return self.players[idx]
 
 	def add_AI_player(self): # Add a dumb AI
 		self.players.append(AIPlayer(self.new_player_balance))
@@ -122,23 +191,6 @@ class PokerEnvironment():
 				count += 1
 		return count
 	
-	# # def determine_strongest_hand(self): # Move to a separate function evaluator
-	# 	# Refer to https://www.poker.org/poker-hands-ranking-chart/. 
-	# 	# PRE: This function should only be called after the river has been played
-		
-	# 	# We update by having the players no longer playing the round
-	# 	remaining_players = self.get_remaining_players_in_round()
-	# 	for player in remaining_players:
-	# 		card_combinations: List[Card] = player.hand + self.community_cards
-			
-	# 		# Find best possible 5-card combination
-	# 		ranks = [card.rank for card in card_combinations]
-	# 		suits = [card.suit for card in card_combinations]
-			
-			
-	# 		card_combinations.sort(key=lambda x: x.rank, reverse=True)
-
-
 	def print_board(self):
 		for card in self.community_cards:
 			card.print()
@@ -202,7 +254,7 @@ class PokerEnvironment():
 					position_in_play -= len(self.players)
 
 				player = self.players[position_in_play]
-				player.update_observed_environment(self)
+				# player.update_observed_environment(self) #TODO: For AI this is important
 				player_bet = player.place_bet()
 				self.min_bet_size = max(player_bet, self.min_bet_size)
 				self.pot_balance += player_bet
@@ -260,7 +312,7 @@ class PokerEnvironment():
 	def play_flop_or_turn_or_river(self): # To make code more efficient
 		self.min_bet_size = 0 #  the min-bet size is now 0, since players can simply check
 		for player in self.get_remaining_players_in_round():
-			player.update_observed_environment(self)
+			# player.update_observed_environment(self) # TODO: Once you do the AI Part, this will be important
 			player_bet = player.place_bet()
 			self.min_bet_size = max(player_bet, self.min_bet_size)
 			self.pot_balance += player_bet
@@ -269,69 +321,3 @@ class PokerEnvironment():
 				# This is automatically updated at the player level, but just to be safe
 				player.playing_current_round = False
 		
-
-class Player(): # This is the POV
-	def __init__(self, balance) -> None:
-		self.hand: List[Card] = [] # The hand is also known as hole cards: https://en.wikipedia.org/wiki/Texas_hold_%27em
-		self.player_balance = balance # TODO: Important that this value cannot be modified easily...
-		self.current_bet = 0
-		
-		self.playing_current_round = True
-		
-		self.observed_env: PokerEnvironment = None
-
-	# Wellformedness, hand is always either 0 or 2 cards
-	
-	def add_card_to_hand(self, card: Card):
-		self.hand.append(card)
-		assert(len(self.hand) <= 2)
-	
-	def clear_hand(self):
-		self.hand = []
-	
-	def set_current_bet(self, bet: int):
-		self.current_bet = bet
-		self.player_balance -= self.current_bet
-
-	def update_observed_environment(self, env: PokerEnvironment): # Partially observed environment
-		self.observed_env = env
-
-
-	def place_bet(self) -> int:
-		action = input("Choose you action ('Check', 'Bet', 'Call', or 'Fold'):")
-		if action == "Check":
-			if self.observed_env.min_bet_size > 0: 
-				print("You cannot check, since there is a bet. You can either 'Bet' or 'Fold'.")
-				return self.place_bet()
-
-			else:
-				self.set_current_bet(0)
-
-		elif action == "Bet":
-			self.set_current_bet(self.observed_env.big_blind)
-		
-		elif action ==  "Call": # Only Applies to small blind for now, so take away another small blind value
-			self.set_current_bet(self.observed_env.small_blind)
-
-		elif action == "Fold":
-			self.set_current_bet(0)
-			self.playing_current_round = False
-		
-		else:
-			print("Invalid action")
-			return self.place_bet()
-		
-		return self.current_bet
-
-
-
-class AIPlayer(Player):
-	def __init__(self, balance) -> None:
-		super().__init__(balance)
-	
-	def place_bet(self) -> int: # AI will bet every single round
-		self.set_current_bet(self.observed_env.big_blind)
-		
-		return self.current_bet
-	
-	

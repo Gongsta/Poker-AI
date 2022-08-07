@@ -478,15 +478,15 @@ class UnitTests(unittest.TestCase):
 		evaluator.add_hands(hand, hand2)
 		self.assertEqual(evaluator.get_winner(), [0,1])
 
-# class IntegrationTests(unittest.TestCase):
+class IntegrationTests(unittest.TestCase):
 
-# 	def test_environment(self):
-# 		env = PokerEnvironment()
-# 		# Add 2 Players
-# 		env.add_player()
-# 		env.add_player()
+	def test_environment(self):
+		env = PokerEnvironment()
+		# Add 2 Players
+		env.add_player()
+		env.add_player()
 		
-# 		env.start_new_round()
+		env.start_new_round()
 		
 
 # To Check how fast my poker hand evaluator is
