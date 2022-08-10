@@ -38,27 +38,23 @@ OPPONENT_CARD_1 = (398,35)
 OPPONENT_CARD_2 = (440,35)
 
 
+INVERSE_RANK_KEY = {14: "A", 2: "02", 3: "03", 4:"04", 5:"05", 6:"06",
+			7:"07", 8:"08", 9:"09", 10:"10", 11: "J", 12: "Q", 13: "K"}
 """Events
 post event: pygame.event.post(pygame.event.Event(pygame.USER_EVENT + 1))
 And then you check this event in the while True loop
 
 """
 
-# def load_images():
 	
-# env = PokerEnvironment()
-# env.add_AI_player()
-# env.add_player()
-
-# env.start_new_round()
-
 dealer_button = pygame.transform.scale(pygame.image.load("assets/dealer_button.png"), (30,30))
 card = pygame.image.load("assets/cards/card_hearts_02.png")
-card_back = pygame.image.load("assets/cards/card_back.png")
+CARD_BACK = pygame.image.load("assets/cards/card_back.png")
 
 
 POT_FONT = pygame.font.SysFont('comicsans', 30)
-BET_FONT = pygame.font.SysFont('comicsans', 35)
+BET_BUTTON_FONT = pygame.font.SysFont('comicsans', 35)
+BET_FONT = pygame.font.SysFont('comicsans', 26)
 PLAYERS_FONT = pygame.font.SysFont('comicsans', 24)
 
 # To rescale: pygame.transform.scale(card, (width, height))
@@ -69,11 +65,54 @@ PLAYERS_FONT = pygame.font.SysFont('comicsans', 24)
 # rect = Pygame.Rect(x,y, width, height)
 # You can then access coordinates with rect.x, rect.y, rect.width, rect.height,
 
-# checking for collisions, use colliderect
-def draw_window():
-	WIN.blit(POKER_BACKGROUND, (0,0))
+# checking for collisions, use colliderectd
 
+# BUTTONS
+fold_rect = pygame.Rect(550, 440, 100,45) 
+check_rect = pygame.Rect(665, 440, 100,45)
+raise_rect = pygame.Rect(780, 440, 100,45)
+buttons = [fold_rect, check_rect, raise_rect]
 
+def load_card_image(card: Card):
+	return pygame.image.load("assets/cards/card_" + card.suit.lower() + "_" + INVERSE_RANK_KEY[card.rank] + ".png")
+
+def display_total_pot_balance(env: PokerEnvironment):
+	pot_information = POT_FONT.render("Total Pot: $" + str(env.total_pot_balance), 1, WHITE)
+	WIN.blit(pot_information, (545, 170))
+
+def display_stage_pot_balance(env: PokerEnvironment):
+	pot_information = POT_FONT.render("Current Pot: $" + str(env.stage_pot_balance), 1, WHITE)
+	WIN.blit(pot_information, (545, 190))
+
+def display_user_balance(env: PokerEnvironment):
+	player_balance = PLAYERS_FONT.render("$"+str(env.players[0].player_balance - env.players[0].current_bet), 1, GREEN)
+	WIN.blit(player_balance, (425, 430))
+
+def display_opponent_balance(env: PokerEnvironment):
+	opponent_balance = PLAYERS_FONT.render("$" + str(env.players[1].player_balance - env.players[1].current_bet), 1, GREEN)
+	WIN.blit(opponent_balance, (425, 108))
+
+def display_user_bet(env: PokerEnvironment):
+	pot_information = BET_FONT.render("Bet: $" + str(env.players[0].current_bet), 1, WHITE)
+	WIN.blit(pot_information, (420, 320))
+
+def display_opponent_bet(env: PokerEnvironment):
+	pot_information = BET_FONT.render("Bet: $" + str(env.players[1].current_bet), 1, WHITE)
+	WIN.blit(pot_information, (420, 150))
+
+def display_user_cards(env: PokerEnvironment):
+	WIN.blit(load_card_image(env.players[0].hand[0]), PLAYER_CARD_1)
+	WIN.blit(load_card_image(env.players[0].hand[1]), PLAYER_CARD_2)
+
+def display_opponent_cards(env: PokerEnvironment):
+	WIN.blit(CARD_BACK,OPPONENT_CARD_1)
+	WIN.blit(CARD_BACK,OPPONENT_CARD_2)
+
+def reveal_opponent_cards(env: PokerEnvironment):
+	WIN.blit(load_card_image(env.players[1].hand[0]),OPPONENT_CARD_1)
+	WIN.blit(load_card_image(env.players[1].hand[1]),OPPONENT_CARD_2)
+
+def display_community_cards(env: PokerEnvironment):
 	# Draw the CARDS
 	WIN.blit(card,FLOP_1_CARD_POSITION)
 	WIN.blit(card,FLOP_2_CARD_POSITION)
@@ -81,71 +120,99 @@ def draw_window():
 	WIN.blit(card,TURN_CARD_POSITION)
 	WIN.blit(card,RIVER_CARD_POSITION)
 
-	WIN.blit(card, PLAYER_CARD_1)
-	WIN.blit(card, PLAYER_CARD_2)
 
-	WIN.blit(card_back,OPPONENT_CARD_1)
-	WIN.blit(card_back,OPPONENT_CARD_2)
+def display_dealer_button(env: PokerEnvironment):
+	if env.dealer_button_position == 0: # User is the dealer
+		WIN.blit(dealer_button, (515, 120))
+	else: # Opponent is the dealer
+		WIN.blit(dealer_button, (355, 350))
+
+def draw_window(env: PokerEnvironment):
+	WIN.blit(POKER_BACKGROUND, (0,0))
+
+	# Display the cards
+	display_user_cards(env)
+	# display_opponent_cards(env)
+	reveal_opponent_cards(env)
+
+	# Display Pot Information
+	display_total_pot_balance(env)
+	display_stage_pot_balance(env)
+	display_dealer_button(env)	
 	
-	# Player 1 Information
+	# TODO: Display Current bet information
+	display_user_bet(env)
+	display_opponent_bet(env)
+
+	
+	# Display the player names
 	AAfilledRoundedRect(WIN, BLACK, pygame.Rect(392,400, 120,50), radius=0.7)
-	player_name = PLAYERS_FONT.render("You", 1, WHITE)
-	WIN.blit(player_name, (437, 410))
-	player_balance = PLAYERS_FONT.render("$1,000", 1, GREEN)
-	WIN.blit(player_balance, (425, 430))
-
-	# Opponent
 	AAfilledRoundedRect(WIN, BLACK, pygame.Rect(392,80, 120,50), radius=0.7)
-	# Text Information
+	player_name = PLAYERS_FONT.render("You", 1, WHITE)
 	opponent_name = PLAYERS_FONT.render("Opponent",1, GREEN)
+	WIN.blit(player_name, (437, 410))
 	WIN.blit(opponent_name, (414, 88))
-	opponent_balance = PLAYERS_FONT.render("$1,500", 1, GREEN)
-	WIN.blit(opponent_balance, (425, 108))
 	
-	# POT INFORMATION
-	pot_information = POT_FONT.render("Pot: $" + str(30), 1, WHITE)
-	WIN.blit(pot_information, (415, 170))
+	# Display Player Balance Information
+	display_user_balance(env)
+	display_opponent_balance(env)
+	
 
-	WIN.blit(dealer_button, (515, 120))
-	WIN.blit(dealer_button, (355, 350))
-	
-	
-	# Pressable Buttons for Check / Fold / Raise
-	# AAfilledRoundedRect(WIN, RED, pygame.Rect(392,400, 120,50), radius=0.4)
-	AAfilledRoundedRect(WIN, RED, pygame.Rect(550, 440, 100,45), radius=0.4)
-	AAfilledRoundedRect(WIN, RED, pygame.Rect(665, 440, 100,45), radius=0.4)
-	AAfilledRoundedRect(WIN, RED, pygame.Rect(780, 440, 100,45), radius=0.4)
-	fold_bet = BET_FONT.render("Fold", 1, WHITE)
-	check_bet = BET_FONT.render("Check", 1, WHITE) 
-	call_bet = BET_FONT.render("Call", 1, WHITE) 
-	raise_bet = BET_FONT.render("Raise", 1, WHITE)
-	
-	WIN.blit(fold_bet, (574, 450))
-	WIN.blit(check_bet, (680, 450))
-	# WIN.blit(call_bet, (689, 450))
-	WIN.blit(raise_bet, (797, 450))
+	# Pressable Buttons for Check / Fold / Raise. Only display buttons if it is your turn
+	if env.position_in_play == 0:
+		# AAfilledRoundedRect(WIN, RED, pygame.Rect(392,400, 120,50), radius=0.4)
+		AAfilledRoundedRect(WIN, RED, fold_rect, radius=0.4)
+		AAfilledRoundedRect(WIN, RED, check_rect, radius=0.4)
+		AAfilledRoundedRect(WIN, RED, raise_rect, radius=0.4)
 
-
+		fold_bet = BET_BUTTON_FONT.render("Fold", 1, WHITE)
+		check_bet = BET_BUTTON_FONT.render("Check", 1, WHITE) 
+		call_bet = BET_BUTTON_FONT.render("Call", 1, WHITE) 
+		raise_bet = BET_BUTTON_FONT.render("Raise", 1, WHITE)
 	
+		WIN.blit(fold_bet, (574, 450))
+		WIN.blit(check_bet, (680, 450))
+		# WIN.blit(call_bet, (689, 450))
+		WIN.blit(raise_bet, (797, 450))
 
 	pygame.display.update()
 
+
+
 def main():
+	env = PokerEnvironment()
+	env.add_player() # You
+	env.add_AI_player() # Opponent
+
 	clock = pygame.time.Clock()
 	run = True
 	while run:
 		clock.tick(FPS)
+		
+		handler_called = False
+			
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				run = False
 				
+			# Check if the buttons are clicked, only process if it is our turn
+			if event.type == pygame.MOUSEBUTTONDOWN and env.position_in_play == 0:
+				for i in range(3): # Check for willision with the three buttons
+					if buttons[i].collidepoint(pygame.mouse.get_pos()):
+						if i == 0:
+							env.handle_game_stage("Fold")
+						elif i == 1:
+							env.handle_game_stage("Check")
+						else:
+							env.handle_game_stage("Bet")
+						
+						handler_called = True
+						break
+		
+		if not handler_called:
+			env.handle_game_stage()
 			
-			# Check if the buttons are clicked
-			if event.type == pygame.MOUSEBUTTONDOWN:
-				print("key has been pressed")
-			
-		# keys_pressed = pygame.key.get_pressed()
-		draw_window()
+		draw_window(env)
 
 	pygame.quit()
 
