@@ -1,78 +1,6 @@
 # The Poker Environment
-import random
+from evaluator import *
 from typing import List
-
-CARD_RANKS = [i for i in range(2, 15)] # Jack = 11, Queen = 12, King = 13, IMPORTANT: Ace = 14 since we use that for sorting
-CARD_SUITS = ["Clubs", "Diamonds", "Hearts","Spades"] 
-
-RANK_KEY = {"A": 14, "2": 2, "3": 3, "4":4, "5":5, "6":6,
-			"7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K":13}
-
-INVERSE_RANK_KEY = {14: "A", 2: "02", 3: "03", 4:"04", 5:"05", 6:"06",
-			7:"07", 8:"08", 9:"09", 10:"10", 11: "J", 12: "Q", 13: "K"}
-
-SUIT_KEY = {"C": "Clubs", "D": "Diamonds", "H":"Hearts","S": "Spades"}
-
-class Card():
-	# Immutable after it has been initialized
-	def __init__(self, rank=1, suit="Spades", rank_suit=None, generate_random=False) -> None:
-
-		if rank_suit: # Ex: "KD" (King of diamonds), "10H" (10 of Hearts),
-			self.__suit = SUIT_KEY[rank_suit[-1]]
-			self.__rank = RANK_KEY[rank_suit[:-1]]
-
-		else:
-			self.__rank = rank
-			self.__suit = suit
-		
-		if generate_random: # If we want to just generate a random card
-			self.__rank = random.choice(CARD_RANKS)
-			self.__suit = random.choice(CARD_SUITS)
-	
-		# Check validity of card TODO: Maybe put into separate function to check wellformedness
-		if self.__rank not in CARD_RANKS:
-			raise Exception("Invalid Rank: {}".format(self.__rank))
-		if self.__suit not in CARD_SUITS: 
-			raise Exception("Invalid Suit: {}".format(self.__suit))
-
-	@property
-	def rank(self):
-		return self.__rank
-
-	@property
-	def suit(self):
-		return self.__suit
-	
-	def print(self):
-		print("  ", self.rank, "of", self.suit)
-	
-
-class Deck():
-	def __init__(self) -> None: # Create a new full deck
-		self.__cards: List[Card] = []
-		self.reset_deck()
-	
-	def shuffle(self):
-		random.shuffle(self.__cards)
-
-	def reset_deck(self):
-		self.__cards = []
-		for rank in CARD_RANKS:
-			for suit in CARD_SUITS:
-				self.__cards.append(Card(rank, suit))
-		
-		random.shuffle(self.__cards)
-
-
-	@property
-	def total_remaining_cards(self):
-		return len(self.__cards)
-
-	def draw(self): # Draw a card from the current deck
-		card = self.__cards.pop()
-		return card
-		
-ACTIONS = ["Check", "Bet", "Call", "Fold"]
 
 class Player(): # This is the POV
 	def __init__(self, balance) -> None:
@@ -82,7 +10,6 @@ class Player(): # This is the POV
 		self.player_balance = balance # TODO: Important that this value cannot be modified easily...
 		self.current_bet = 0
 
-		
 		self.playing_current_round = True
 		
 
@@ -103,19 +30,12 @@ class Player(): # This is the POV
 
 
 	def place_bet(self, action: str, observed_env) -> int:
-		if action == "Check":
-			if observed_env.min_bet_size > 0: 
-				return Exception("You cannot check, since there is a bet. You can either 'Bet' or 'Fold'.")
-
-			else:
-				self.set_current_bet(0)
-
 		# TODO: This logic is bad
-		elif action == "Bet":
-			self.set_current_bet(observed_env.small_blind)
+		if action == "Raise":
+			self.set_current_bet(max(2*observed_env.min_bet_size, observed_env.big_blind))
 		
-		elif action ==  "Call": # 
-			self.set_current_bet(observed_env.big_blind)
+		elif action == "Call": # 
+			self.set_current_bet(observed_env.min_bet_size)
 
 		elif action == "Fold":
 			self.playing_current_round = False # Balance of all players will be updated at the end of the round
@@ -267,11 +187,13 @@ class PokerEnvironment():
 				return 
 			else:
 				player_bet = self.players[self.position_in_play].place_bet(action, self)
-
-		self.min_bet_size = max(player_bet, self.min_bet_size)
+				
+		if (player_bet > self.min_bet_size):
+			self.min_bet_size = player_bet
+			self.first_player_to_place_highest_bet = self.position_in_play
 		self.update_stage_pot_balance()
+
 			
-		print(self.count_remaining_players_in_round())
 		if self.count_remaining_players_in_round() == 1: # Round is over, distribute winnings
 			self.finished_playing_game_stage = True
 			self.game_stage = 6
@@ -292,8 +214,8 @@ class PokerEnvironment():
 			self.position_in_play %= len(self.players)
 		
 	def play_preflop(self):
-		self.position_in_play = self.dealer_button_position + 3
-		self.position_in_play %= len(self.players)
+		self.position_in_play = (self.dealer_button_position + 3) % len(self.players)
+		self.first_player_to_place_highest_bet = self.position_in_play
 
 		self.min_bet_size = self.big_blind
 		
@@ -306,6 +228,11 @@ class PokerEnvironment():
 		for _ in range(3): # Draw 3 cards
 			self.community_cards.append(self.deck.draw())
 
+		# The person that should play is the first person after the dealer position
+		self.position_in_play = self.dealer_button_position   
+		self.move_to_next_player()
+		self.first_player_to_place_highest_bet = self.position_in_play
+
 		self.finished_playing_game_stage = False
 				
 	def play_turn(self):
@@ -313,6 +240,11 @@ class PokerEnvironment():
 		# 4. Turn
 		self.deck.draw() # We must first burn one card, TODO: Show on video
 		self.community_cards.append(self.deck.draw())
+		
+		# The person that should play is the first person after the dealer position
+		self.position_in_play = self.dealer_button_position   
+		self.move_to_next_player()
+		self.first_player_to_place_highest_bet = self.position_in_play
 		
 		self.finished_playing_game_stage = False
 			
@@ -323,7 +255,6 @@ class PokerEnvironment():
 		self.community_cards.append(self.deck.draw())
 
 		self.finished_playing_game_stage = False
-		
 		
 	def update_player_balances_at_end_of_stage(self):
 		for player in self.players:
@@ -351,6 +282,23 @@ class PokerEnvironment():
 			elif self.game_stage == 5:
 				self.play_river()
 			else:
+				if self.game_stage == 6: # We reached the river, and are now in the showdown. We need the evaluator to get the winners, set all losers to playing_current_round false
+					evaluator = Evaluator()
+					
+					indices_of_potential_winners = []
+					for idx, player in enumerate(self.players):
+						if player.playing_current_round: 
+							indices_of_potential_winners.append(idx)
+							hand = CombinedHand(self.community_cards + player.hand)
+							evaluator.add_hands(hand)
+					
+					winners = evaluator.get_winner()
+					for player in self.players:
+						player.playing_current_round = False
+
+					for winner in winners:
+						self.players[indices_of_potential_winners[winner]].playing_current_round = True
+
 				self.distribute_pot_to_winning_players()
 				self.game_stage = 1
 				self.finished_playing_game_stage = False # on the next call of the handler, we will start a new round

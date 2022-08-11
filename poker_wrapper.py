@@ -114,11 +114,17 @@ def reveal_opponent_cards(env: PokerEnvironment):
 
 def display_community_cards(env: PokerEnvironment):
 	# Draw the CARDS
-	WIN.blit(card,FLOP_1_CARD_POSITION)
-	WIN.blit(card,FLOP_2_CARD_POSITION)
-	WIN.blit(card,FLOP_3_CARD_POSITION)
-	WIN.blit(card,TURN_CARD_POSITION)
-	WIN.blit(card,RIVER_CARD_POSITION)
+	for idx, card in enumerate(env.community_cards):
+		if idx == 0:
+			WIN.blit(load_card_image(card),FLOP_1_CARD_POSITION)
+		elif idx == 1:
+			WIN.blit(load_card_image(card),FLOP_2_CARD_POSITION)
+		elif idx == 2:
+			WIN.blit(load_card_image(card),FLOP_3_CARD_POSITION)
+		elif idx == 3:
+			WIN.blit(load_card_image(card),TURN_CARD_POSITION)
+		else:
+			WIN.blit(load_card_image(card),RIVER_CARD_POSITION)
 
 
 def display_dealer_button(env: PokerEnvironment):
@@ -134,6 +140,9 @@ def draw_window(env: PokerEnvironment):
 	display_user_cards(env)
 	# display_opponent_cards(env)
 	reveal_opponent_cards(env)
+	
+	# Display Community Cards
+	display_community_cards(env)
 
 	# Display Pot Information
 	display_total_pot_balance(env)
@@ -166,13 +175,16 @@ def draw_window(env: PokerEnvironment):
 		AAfilledRoundedRect(WIN, RED, raise_rect, radius=0.4)
 
 		fold_bet = BET_BUTTON_FONT.render("Fold", 1, WHITE)
-		check_bet = BET_BUTTON_FONT.render("Check", 1, WHITE) 
-		call_bet = BET_BUTTON_FONT.render("Call", 1, WHITE) 
-		raise_bet = BET_BUTTON_FONT.render("Raise", 1, WHITE)
-	
 		WIN.blit(fold_bet, (574, 450))
-		WIN.blit(check_bet, (680, 450))
-		# WIN.blit(call_bet, (689, 450))
+
+		if env.min_bet_size == 0:
+			check_bet = BET_BUTTON_FONT.render("Check", 1, WHITE) 
+			WIN.blit(check_bet, (680, 450))
+		else:
+			call_bet = BET_BUTTON_FONT.render("Call", 1, WHITE) 
+			WIN.blit(call_bet, (689, 450))
+
+		raise_bet = BET_BUTTON_FONT.render("Raise", 1, WHITE)
 		WIN.blit(raise_bet, (797, 450))
 
 	pygame.display.update()
@@ -202,9 +214,9 @@ def main():
 						if i == 0:
 							env.handle_game_stage("Fold")
 						elif i == 1:
-							env.handle_game_stage("Check")
+							env.handle_game_stage("Call")
 						else:
-							env.handle_game_stage("Bet")
+							env.handle_game_stage("Raise")
 						
 						handler_called = True
 						break

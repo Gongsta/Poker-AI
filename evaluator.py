@@ -27,8 +27,8 @@ policy. If the game is slow, then there is no point.
 """
 
 # Representation is key to performance. This is going to be terrifying, as I am going to be working with bits..
-from environment import *
-import math
+from typing import List
+import random
 from table import generate_table
 
 BIT_POSITION_TABLE = generate_table()
@@ -49,6 +49,79 @@ BIT_MASKS = [BIT_MASK_1, BIT_MASK_2, BIT_MASK_4, BIT_MASK_8]
 1000 (8) -> Spades
 """
 CARD_BIT_SUITS_DICT = {1: "Clubs", 2: "Diamonds", 4: "Hearts", 8: "Spades"}
+
+CARD_RANKS = [i for i in range(2, 15)] # Jack = 11, Queen = 12, King = 13, IMPORTANT: Ace = 14 since we use that for sorting
+CARD_SUITS = ["Clubs", "Diamonds", "Hearts","Spades"] 
+
+RANK_KEY = {"A": 14, "2": 2, "3": 3, "4":4, "5":5, "6":6,
+			"7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K":13}
+
+INVERSE_RANK_KEY = {14: "A", 2: "02", 3: "03", 4:"04", 5:"05", 6:"06",
+			7:"07", 8:"08", 9:"09", 10:"10", 11: "J", 12: "Q", 13: "K"}
+
+SUIT_KEY = {"C": "Clubs", "D": "Diamonds", "H":"Hearts","S": "Spades"}
+
+class Card():
+	# Immutable after it has been initialized
+	def __init__(self, rank=1, suit="Spades", rank_suit=None, generate_random=False) -> None:
+
+		if rank_suit: # Ex: "KD" (King of diamonds), "10H" (10 of Hearts),
+			self.__suit = SUIT_KEY[rank_suit[-1]]
+			self.__rank = RANK_KEY[rank_suit[:-1]]
+
+		else:
+			self.__rank = rank
+			self.__suit = suit
+		
+		if generate_random: # If we want to just generate a random card
+			self.__rank = random.choice(CARD_RANKS)
+			self.__suit = random.choice(CARD_SUITS)
+	
+		# Check validity of card TODO: Maybe put into separate function to check wellformedness
+		if self.__rank not in CARD_RANKS:
+			raise Exception("Invalid Rank: {}".format(self.__rank))
+		if self.__suit not in CARD_SUITS: 
+			raise Exception("Invalid Suit: {}".format(self.__suit))
+
+	@property
+	def rank(self):
+		return self.__rank
+
+	@property
+	def suit(self):
+		return self.__suit
+	
+	def print(self):
+		print("  ", self.rank, "of", self.suit)
+	
+
+class Deck():
+	def __init__(self) -> None: # Create a new full deck
+		self.__cards: List[Card] = []
+		self.reset_deck()
+	
+	def shuffle(self):
+		random.shuffle(self.__cards)
+
+	def reset_deck(self):
+		self.__cards = []
+		for rank in CARD_RANKS:
+			for suit in CARD_SUITS:
+				self.__cards.append(Card(rank, suit))
+		
+		random.shuffle(self.__cards)
+
+
+	@property
+	def total_remaining_cards(self):
+		return len(self.__cards)
+
+	def draw(self): # Draw a card from the current deck
+		card = self.__cards.pop()
+		return card
+		
+ACTIONS = ["Fold", "Call", "Raise"]
+
 
 
 class CombinedHand:
