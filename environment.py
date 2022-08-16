@@ -90,7 +90,7 @@ class PokerEnvironment():
 		self.small_blind = 50 
 		self.big_blind = 100 # TODO: Check if this is even necessary 
 		
-	
+		self.multi_binary_representation = [] # TODO: this is used for the RL part, to make updating the hands a bit easier
 	def add_player(self):
 		self.players.append(Player(self.new_player_balance))
 

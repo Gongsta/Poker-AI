@@ -90,6 +90,19 @@ class Card():
 	@property
 	def suit(self):
 		return self.__suit
+
+	@property
+	def idx(self):
+		"""
+		Used for the RL part. We will represent the hand as a list of 52 binary integers.
+		[AC, AD, AH, AS, 2C, 2D, ... KH, KS]
+		0 .  1 . 2 . 3 . 4 . 5 .     50, 51  
+		"""
+		rank = self.__rank
+		if self.__rank == 14: # for the aces
+			rank = 1
+		rank -= 1
+		return rank*4 + CARD_SUITS_DICT[self.__suit]
 	
 	def print(self):
 		print("  ", self.rank, "of", self.suit)
@@ -139,6 +152,13 @@ class CombinedHand:
 
 	def get_binary_representation(self):
 		return bin(self.h)
+		
+	def get_array_binary_representation(self): # For the AI part
+		rep = [0 for i in range(52)]
+		for card in self.hand:
+			rep[card.idx] = 1
+
+		return rep
 	
 	def get_hand_strength(self, verbose=False):
 		# In case of ties, we set self.comparator:
