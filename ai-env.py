@@ -6,6 +6,13 @@ from evaluator import CombinedHand
 
 N_DISCRETE_ACTIONS = 3 # Fold, Check/Bet, Raise
 
+"""
+Resources to learn to write the gym env:
+- https://www.gymlibrary.ml/content/environment_creation/
+- https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html
+- https://colab.research.google.com/github/araffin/rl-tutorial-jnrr19/blob/master/5_custom_gym_env.ipynb?authuser=0#scrollTo=i62yf2LvSAYY
+
+"""
 class PokerEnv(gym.Env):
 	"""Custom Environment that follows gym interface"""
 	metadata = {'render.modes': ['human']}
