@@ -1,8 +1,3 @@
-# Check out pygame implementations
-#https://github.com/hsahib2912/AI-Flappy-Birds/blob/b2a72d00913fb0cb0b412d6563f17f6bc3f62b80/AI_project.py
-# https://github.com/yenchenlin/DeepLearningFlappyBird/tree/master/game
-# Tech with Tim Tutorial: https://www.youtube.com/watch?v=jO6qQDNa2UY&t=4178s&ab_channel=TechWithTim
-
 from environment import *
 from helper import *
 import pygame 
