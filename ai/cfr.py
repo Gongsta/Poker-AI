@@ -1,6 +1,6 @@
+
 """
-This is an implemention of CFR for Kuhn Poker. We see that the payoff is around -0.056, because
-player 1 needs to act first. Player 2 is at an advantage because they act second.
+Built on top of code from cfr-learning/3.4.cfr.py
 """
 from audioop import avg
 from distutils.log import info
