@@ -6,6 +6,7 @@ from audioop import avg
 from distutils.log import info
 from random import shuffle
 import numpy as np
+import joblib
 
 # Kuhn Poker definitions
 PASS, BET, NUM_ACTIONS = 0,1,2
@@ -17,6 +18,9 @@ class Node:
 		self.regretSum = np.zeros(NUM_ACTIONS)
 		self.strategy = np.zeros(NUM_ACTIONS)
 		self.strategySum = np.zeros(NUM_ACTIONS)
+	
+	def describe(self):
+		print("Infoset: {} -> Strategy at this infoset: {}".format(self.infoSet, np.around(self.getAverageStrategy(), 2)))
 
 	def getStrategy(self, realization_weight):
 		for a in range(NUM_ACTIONS):
@@ -52,14 +56,14 @@ def cfr(cards, history, p0, p1):
 	
 	# Return payoff for terminal states
 	if (plays > 1):
-		terminalPass = history[plays-1] == 'p'
-		doubleBet = history[plays-2:plays] == "bb"
+		terminalPass = history[-1] == 'p'
+		doubleBet = history[-2:] == "bb"
 		isPlayerCardHigher = cards[player] > cards[opponent]
 		
 		if terminalPass:
 			if history == "pp": 
 				return 1 if isPlayerCardHigher else -1
-			else: 
+			else: # Two cases no? "bp", and "pbp"
 				return 1
 	
 		elif doubleBet:
@@ -100,4 +104,13 @@ def train(iterations):
 	
 	
 if __name__ == "__main__":
-	train(1000000)
+	train_from_scratch = False # Set this to True if you want to retrain from scratch
+	if train_from_scratch:
+		train(1000000)
+		joblib.dump(nodeMap, "KuhnNodeMap.joblib")
+	else:
+		nodeMap = joblib.load("KuhnNodeMap.joblib")
+
+	print("Total Number of Infosets:", len(nodeMap))
+	for infoset in nodeMap:
+		nodeMap[infoset].describe()
