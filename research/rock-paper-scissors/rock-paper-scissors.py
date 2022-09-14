@@ -1,3 +1,7 @@
+"""
+Wrote this script to illustrate why reinforcement learning doesn't work on RPS, 
+(because it outputs a deterministic strategy, which can be easily exploited).
+"""
 import gym
 from gym import spaces
 import numpy as np

@@ -19,7 +19,7 @@ import numpy as np
 import argparse
 import matplotlib.pyplot as plt
 
-from cfr import Node
+from train import Node
 
 PLAYER = 0
 AI = 1
@@ -186,7 +186,7 @@ if __name__ == "__main__":
 		plt.legend(['Deterministic Strategy', "CFR Strategy"], loc="upper left")
 	plt.xlabel("Number of Rounds")
 	plt.ylabel("Number of Chips Gained")
-	plt.savefig("AI_score_over_time.png", bbox_inches='tight')
+	# plt.savefig("AI_score_over_time.png", bbox_inches='tight') # Uncomment to save the figure
 	plt.show()
 		
 

@@ -1,6 +1,9 @@
 
 """
-Built on top of code from cfr-learning/3.4.cfr.py
+Built on top of code from cfr-learning/3.4.cfr.py. Used to train a CFR model
+solving Kuhn Poker and stored the weights as `KuhnNodeMap.joblib`
+
+This should only take at max 1 minute to train a strategy that is approximately Nash.
 """
 from audioop import avg
 from distutils.log import info

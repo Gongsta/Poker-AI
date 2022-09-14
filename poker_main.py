@@ -1,6 +1,7 @@
 from environment import *
 from helper import *
 import pygame 
+import argparse
 import os
 
 pygame.font.init() # For fonts
@@ -148,7 +149,6 @@ def draw_window(env: PokerEnvironment):
 	display_user_bet(env)
 	display_opponent_bet(env)
 
-	
 	# Display the player names
 	AAfilledRoundedRect(WIN, BLACK, pygame.Rect(392,400, 120,50), radius=0.7)
 	AAfilledRoundedRect(WIN, BLACK, pygame.Rect(392,80, 120,50), radius=0.7)
@@ -186,7 +186,24 @@ def draw_window(env: PokerEnvironment):
 
 
 
+def getStrategy(env):
+	return "Bet"
+
 def main():
+	score = [0, 0] # [PLAYER_SCORE, AI_SCORE]
+	# Load the nodeMap
+	parser = argparse.ArgumentParser(description='Play Kuhn Poker against the best AI possible.')
+	parser.add_argument("-p", "--play",
+                    action="store_true", dest="user_input", default=False,
+                    help="Manually play against the AI through a PyGame interface.")
+	parser.add_argument("-v", "--verbose",
+                    action="store_true", dest="verbose", default=True,
+                    help="Manually play against the AI through the terminal.")
+
+	args = parser.parse_args()
+	user_input = args.user_input
+	verbose = args.verbose # In case you want to see each game printed out in the terminal while running the simulation
+	
 	env = PokerEnvironment()
 	env.add_player() # You
 	env.add_AI_player() # Opponent
@@ -203,18 +220,24 @@ def main():
 				run = False
 				
 			# Check if the buttons are clicked, only process if it is our turn
-			if event.type == pygame.MOUSEBUTTONDOWN and env.position_in_play == 0:
-				for i in range(3): # Check for willision with the three buttons
-					if buttons[i].collidepoint(pygame.mouse.get_pos()):
-						if i == 0:
-							env.handle_game_stage("Fold")
-						elif i == 1:
-							env.handle_game_stage("Call")
-						else:
-							env.handle_game_stage("Raise")
-						
-						handler_called = True
-						break
+			if user_input:
+				if event.type == pygame.MOUSEBUTTONDOWN and env.position_in_play == 0:
+					for i in range(3): # Check for willision with the three buttons
+						if buttons[i].collidepoint(pygame.mouse.get_pos()):
+							if i == 0:
+								env.handle_game_stage("Fold")
+							elif i == 1:
+								env.handle_game_stage("Call")
+							else:
+								env.handle_game_stage("Raise")
+							
+							handler_called = True
+							break
+			else:
+				action = getStrategy(env)
+				# Run Simulation
+				env.handle_game_stage(action)
+				return
 		
 		if not handler_called:
 			env.handle_game_stage()

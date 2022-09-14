@@ -1,10 +1,15 @@
 # Poker-AI
 A small personal project that I want to work on this summer. First focusing on Heads-Up Hold-Em Poker. Later project will include 8-people in a table poker. 
 
-
 Personal notes:
 - Naming Convention: "User" for us, "Opponent" for the enemy
 - Future ideas could be using this project as a personal poker trainer (displaying the pot odds). Can help you refine your game
+
+
+### Explanation of Directory
+- `/assets` contains assets used to run Poker on PyGame
+- `/research` contains more background information and code that I wrote before writing the full-on Heads-On Poker 
+
 
 ### Timeline / Goals 
 ##### 1. Create a basic Poker Environment to play in
