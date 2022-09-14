@@ -63,7 +63,7 @@ def cfr(cards, history, p0, p1):
 		if terminalPass:
 			if history == "pp": 
 				return 1 if isPlayerCardHigher else -1
-			else: # Two cases no? "bp", and "pbp"
+			else: # Two cases no? "bp", and "pbp". But that is taken into account during the cfr function call
 				return 1
 	
 		elif doubleBet:
