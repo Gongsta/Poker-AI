@@ -5,11 +5,10 @@ solving Kuhn Poker and stored the weights as `KuhnNodeMap.joblib`
 
 This should only take at max 1 minute to train a strategy that is approximately Nash.
 """
-from audioop import avg
-from distutils.log import info
 from random import shuffle
 import numpy as np
 import joblib
+from tqdm import tqdm
 
 # Kuhn Poker definitions
 PASS, BET, NUM_ACTIONS = 0,1,2
@@ -99,7 +98,7 @@ def cfr(cards, history, p0, p1):
 def train(iterations):
 	cards = [1,2,3]
 	util = 0
-	for i in range(iterations):
+	for i in tqdm(range(iterations), desc="Training Loop"):
 		shuffle(cards)
 		util += cfr(cards, "", 1,1)
 		if (i % 100000 == 0):
@@ -107,7 +106,7 @@ def train(iterations):
 	
 	
 if __name__ == "__main__":
-	train_from_scratch = False # Set this to True if you want to retrain from scratch
+	train_from_scratch = True # Set this to True if you want to retrain from scratch
 	if train_from_scratch:
 		train(1000000)
 		joblib.dump(nodeMap, "KuhnNodeMap.joblib")

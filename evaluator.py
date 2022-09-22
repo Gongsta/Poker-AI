@@ -104,8 +104,8 @@ class Card():
 		rank -= 1
 		return rank*4 + CARD_SUITS_DICT[self.__suit]
 	
-	def print(self):
-		print("  ", self.rank, "of", self.suit)
+	def __str__(self):
+		return  str(self.rank) + " of " + self.suit
 	
 
 class Deck():
@@ -124,7 +124,6 @@ class Deck():
 		
 		random.shuffle(self.__cards)
 
-
 	@property
 	def total_remaining_cards(self):
 		return len(self.__cards)
@@ -138,28 +137,49 @@ ACTIONS = ["Fold", "Call", "Raise"]
 
 
 class CombinedHand:
-	def __init__(self, hand: List [Card]):
+	def __init__(self, hand: List [Card]=[]):
 		self.hand: List[Card] = hand
 		self.hand_strength = 0
 		self.h = 0 
 		self.comparator = 0
-		for card in hand: # Convert cards into our binary representation
+		
+		if hand != None:
+			self.update_binary_representation()
+		
+	def __str__(self):
+		s = ""
+		for h in self.hand:
+			s += str(h) + ", "
+		
+		return s
+	
+	def __len__(self):
+		return len(self.hand)
+
+	def update_binary_representation(self):
+		self.h = 0
+		for card in self.hand: # Convert cards into our binary representation
 			self.h += 1 << int(4 * (card.rank - 1)) << CARD_SUITS_DICT[card.suit] # TODO: I can probs optimize by storing the multiplication in another CARDS_RANK_DICT table
 
 			if card.rank == 14: # For aces, we need to add them at the beginning as well
 				self.h += 1 << CARD_SUITS_DICT[card.suit]
-		
+
+	def add_combined_hands(self, *hands):
+		for hand in hands:
+			for card in hand.hand:
+				self.hand.append(card)
+
+		self.update_binary_representation()
+
+	def add_cards(self, *cards):
+		for card in cards:
+			self.hand.append(card)
+			
+		self.update_binary_representation()
 
 	def get_binary_representation(self):
 		return bin(self.h)
 		
-	def get_array_binary_representation(self): # For the AI part
-		rep = [0 for i in range(52)]
-		for card in self.hand:
-			rep[card.idx] = 1
-
-		return rep
-	
 	def get_hand_strength(self, verbose=False):
 		# In case of ties, we set self.comparator:
 		# 1 (Royal Flush) - Always Tie
@@ -205,6 +225,7 @@ class CombinedHand:
 		h = self.h >> 4 # Ignore the first 4 aces
 		hh = (h) & (h >> 1) & (h >> 2) & (h >> 3) & BIT_MASK_1
 		if hh:
+			print("four of a kind", len(bin(hh)) - 2, bin(hh))
 			four_of_a_kind = BIT_POSITION_TABLE[hh]//4 + 2
 			self.hand_strength = 3
 			kicker = 0

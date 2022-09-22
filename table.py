@@ -2,8 +2,6 @@
 # Lookup table mapping an int -> position of "1" bit
 # Ex: 4 (100) -> 2
 
-
-
 def generate_table():
 	TABLE = {}
 	# Create the table

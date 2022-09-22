@@ -28,7 +28,6 @@ class Player(): # This is the POV
 	# def update_observed_environment(self, env: PokerEnvironment): # Partially observed environment
 	# 	self.observed_env = env
 
-
 	def place_bet(self, action: str, observed_env) -> int:
 		# TODO: This logic is bad
 		if action == "Raise":
@@ -44,7 +43,10 @@ class Player(): # This is the POV
 		
 		return self.current_bet
 
-
+	def calculate_pot_odds(self): # Calculate Pot Odds helper function, basically look at how many hands can you currently beat
+		"""
+		Simple logic, does not account for the pot values.
+		"""
 
 class AIPlayer(Player):
 	def __init__(self, balance) -> None:
@@ -91,6 +93,8 @@ class PokerEnvironment():
 		self.big_blind = 100 # TODO: Check if this is even necessary 
 		
 		self.multi_binary_representation = [] # TODO: this is used for the RL part, to make updating the hands a bit easier
+		
+		self.players_balance_history = [] # List of "n" list for "n" players
 	def add_player(self):
 		self.players.append(Player(self.new_player_balance))
 
@@ -109,12 +113,29 @@ class PokerEnvironment():
 
 		return winning_players
 
+	def get_winning_players_idx(self) -> List:
+		# If there is more than one winning player, the pot is split. We assume that we only run things once
+		winning_players: List = []
+		for idx, player in enumerate(self.players):
+			if player.playing_current_round:
+				winning_players.append(idx)
+
+		return winning_players
 	def distribute_pot_to_winning_players(self): # Run when self.game_stage = 5
 		winning_players = self.get_winning_players()
 		
 		pot_winning = self.total_pot_balance / len(winning_players)
 		for player in winning_players:
 			player.player_balance += pot_winning
+		
+	
+		# Used for graphing later
+		for idx, player in enumerate(self.players):
+			try:
+				self.players_balance_history[idx].append(player.player_balance)
+			except:
+				self.players_balance_history.append([])
+				self.players_balance_history[idx].append(player.player_balance)
 
 		self.total_pot_balance = 0 # Reset the pot just to be safe
 		self.stage_pot_balance = 0 # Reset the pot just to be safe
@@ -132,6 +153,7 @@ class PokerEnvironment():
 			card.print()
 		
 	def start_new_round(self):
+		self.showdown = False
 		assert(len(self.players) >= 2) # We cannot start a poker round with less than 2 players...
 		
 		# Reset Players
@@ -283,6 +305,7 @@ class PokerEnvironment():
 				self.play_river()
 			else:
 				if self.game_stage == 6: # We reached the river, and are now in the showdown. We need the evaluator to get the winners, set all losers to playing_current_round false
+					self.showdown = True
 					evaluator = Evaluator()
 					
 					indices_of_potential_winners = []
@@ -299,12 +322,16 @@ class PokerEnvironment():
 					for winner in winners:
 						self.players[indices_of_potential_winners[winner]].playing_current_round = True
 
-				self.distribute_pot_to_winning_players()
 				self.game_stage = 1
 				self.finished_playing_game_stage = False # on the next call of the handler, we will start a new round
 		else:
 			if self.game_stage == 1:
+				# This function was put here instead of at game_stage == 6 to visualize the game
+				self.distribute_pot_to_winning_players() 
 				self.start_new_round()
 			else:
 				self.play_current_stage(action)
-		
+	
+	def end_of_round(self):
+		return self.game_stage == 1 and self.finished_playing_game_stage == False
+	
