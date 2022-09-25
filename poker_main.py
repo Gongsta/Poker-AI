@@ -4,6 +4,7 @@ import pygame
 import argparse
 import os
 import time
+import joblib
 
 pygame.font.init() # For fonts
 pygame.mixer.init() # For sounds
@@ -209,12 +210,12 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 def main():
 	score = [0, 0] # [PLAYER_SCORE, AI_SCORE]
 	# Load the nodeMap
-	parser = argparse.ArgumentParser(description='Play Kuhn Poker against the best AI possible.')
+	parser = argparse.ArgumentParser(description="Play Hold'Em Poker against the best AI possible.")
 	parser.add_argument("-p", "--play",
                     action="store_true", dest="user_input", default=False,
                     help="Manually play against the AI through a PyGame interface.")
 	parser.add_argument("-r", "--replay",
-                    action="store_true", dest="render", default=False,
+                    action="store_true", dest="replay", default=False,
                     help="replay a history of games")
 	parser.add_argument("-g", "--god",
                     action="store_true", dest="god_mode", default=False,
@@ -226,7 +227,7 @@ def main():
 	god_mode = args.god_mode
 	
 	if replay: # TODO: Load a history of games, and visualize those
-		history = []
+		history = joblib.load("HoldemTrainingHistory.joblib")
 		game = 0
 		game_i = 0
 	
@@ -260,22 +261,26 @@ def main():
 					for i in range(3): # Check for willision with the three buttons
 						if buttons[i].collidepoint(pygame.mouse.get_pos()):
 							if i == 0:
-								env.handle_game_stage("Fold")
+								env.handle_game_stage("f") # Fold
 							elif i == 1:
-								env.handle_game_stage("Call")
+								env.handle_game_stage("c") # Check / Call
 							else:
-								env.handle_game_stage("Raise")
+								env.handle_game_stage("r") # Raise
 							
 							handler_called = True
 							break
 		
 		if not handler_called:
 			if replay:
+				print(history[game])
 				env.handle_game_stage(history[game][game_i])
 				game_i += 1
 				if game_i >= len(history[game]): # Move onto the next game
 					game += 1
-					game_i += 1
+					game_i = 0
+					if (game == len(history)): 
+						print("Finished replay of all games")
+						return
 
 			else:
 				env.handle_game_stage()

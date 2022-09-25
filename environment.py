@@ -30,13 +30,13 @@ class Player(): # This is the POV
 
 	def place_bet(self, action: str, observed_env) -> int:
 		# TODO: This logic is bad
-		if action == "Raise":
+		if action == "r":
 			self.set_current_bet(max(2*observed_env.min_bet_size, observed_env.big_blind))
 		
-		elif action == "Call": # 
+		elif action == "c": # 
 			self.set_current_bet(observed_env.min_bet_size)
 
-		elif action == "Fold":
+		elif action == "f":
 			self.playing_current_round = False # Balance of all players will be updated at the end of the round
 		else:
 			raise Exception("Invalid Action")

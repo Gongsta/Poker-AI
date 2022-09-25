@@ -10,10 +10,11 @@ from evaluator import Deck, CombinedHand, Evaluator, Card
 import numpy as np
 import joblib
 import copy
+import argparse
 from tqdm import tqdm
 
 """
-For the sake of simplicity, we have the following 3 actions:
+Starting off with simple training, we have the following 3 actions:
 1) Fold
 2) Check/Call
 3) Bet/Raise
@@ -68,6 +69,8 @@ class History():
 		self.curr_round_plays = 0 # if self.curr_round_plays == 0 and we check, then we DON'T move to the next game stage
 
 	
+
+all_history = [] # Global variable to store all histories
 def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], community_cards: CombinedHand,  history: History, p0, p1):
 	"""
 	player_cards: [user_cards, opponent_cards]
@@ -85,10 +88,12 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 	# Return payoff for terminal states
 	if (plays >= 1):
 		if history.history_str[-1] == 'f': # Fold, just calculate total value
+			all_history.append(history.history_str)
 			return history.total_pot_size
 		
 		elif history.game_stage == 6:
 			# Showdown
+			all_history.append(history.history_str)
 			hand = copy.deepcopy(CombinedHand())
 			hand.add_combined_hands(community_cards, private_cards[player])
 
@@ -210,10 +215,22 @@ def train(iterations):
 	
 if __name__ == "__main__":
 	train_from_scratch = True # Set this to True if you want to retrain from scratch
-	if train_from_scratch:
-		
+	parser = argparse.ArgumentParser(description="Train a Hold'Em AI.")
+	parser.add_argument("-s", "--save",
+                    action="store_true", dest="save", default=True,
+                    help="Save the trained model and history")
+	parser.add_argument("-v", "--visualize",
+                    action="store_true", dest="visualize", default=False,
+                    help="Print out all information sets with their corresponding strategy.")
+
+	args = parser.parse_args()
+	save = args.save
+	visualize = args.visualize
+	if not visualize:
 		train(10)
-		joblib.dump(nodeMap, "HoldemNodeMap.joblib")
+		if save:
+			joblib.dump(nodeMap, "HoldemNodeMap.joblib")
+			joblib.dump(all_history, "HoldemTrainingHistory.joblib")
 	else:
 		nodeMap = joblib.load("HoldemNodeMap.joblib")
 

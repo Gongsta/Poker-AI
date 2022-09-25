@@ -1,5 +1,5 @@
 # Poker-AI
-A small personal project that I want to work on this summer. First focusing on Heads-Up Hold-Em Poker (i.e. only 2 people playing against each other). Later project will include 8-people in a table poker.
+Developing an AI agent from scratch to play Heads Up Texas Hold'Em Poker (i.e. 2-player version) using Monte-Carlo Counterfactual Regret Minimization (MCCFR) with Chance Sampling (CS).
 
 Poker is an interesting game to work on because it is an imperfect information game. This means that unlike perfect-information games such as Chess, in Poker, there is this uncertainty about the opponent's hand, which allows really interesting plays like Bluffing.
 
@@ -13,23 +13,28 @@ Poker is a a family comparing card games in which players wager over which hand 
 
 The version of Poker I am going to be using is **No Limit Texas Hold’Em** (NLTHE), this is by far the most popular one used in all the major tournaments. You can familiarize yourself with the rules [here](https://www.pokernews.com/poker-rules/texas-holdem.htm).
 
+Some Specifications
+- Betting rounds happen during each stage At any point, a player can **fold** out of the current round. If only 1 player remains, they win automatically.
+- Then we show 3 community cards, which is known as the **flop**. Followed by a betting round
+- Stage 0-1: Start a new round.
+- Stage 2: Pre-flop.
+- Stage 3: The flop.
+- Stage 4: The turn.
+- Stage 5: River round.
 
-	- Betting rounds happen during each stage At any point, a player can **fold** out of the current round. If only 1 player remains, they win automatically.
-    - Then we show 3 community cards, which is known as the **flop**. Followed by a betting round
-	- Stage 0-1: Start a new round.
-	- Stage 2: Pre-flop.
-	- Stage 3: The flop.
-    - Stage 4: The turn.
-    - Stage 5: River round.
-
-Some of the Class Definitions:
+Class Definitions
 - `Card`s: A Card has a rank (Ace, 2, 3, 4, ..., King) and a suit (Clubs, Diamonds, Hearts, Spades)
 - `Deck`: Composed of 52 `Card`s
 
 ### Explanation of Directory
 - `/assets` contains assets used to run Poker on PyGame
-- `/research` contains more background information and code that I wrote before writing the full-on Heads-On Poker 
+- `/research` contains more background information and code that I wrote before writing the full-on Heads-On Poker
 
+### Concepts
+How to evaluate the performance of the Poker AI? There are 3 main ways to measure the quality of a poker agent:
+1. Measure it against other poker agents
+2. Measure it against humans
+3. Measure it against a “best response” agent that always plays the best response to see how well the agent does in the worst case
 
 ### Timeline / Goals 
 ##### 1. Create a basic Poker Environment to play in
