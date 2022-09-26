@@ -170,7 +170,8 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 	display_opponent_balance(env)
 	
 
-	if env.showdown and env.end_of_round(): # Show who won
+	# if env.showdown and env.end_of_round(): # Show who won
+	if env.end_of_round():
 		winning_players = env.get_winning_players_idx()
 		if len(winning_players) == 2: # Split the pot
 			text = BET_FONT.render("This is a tie", 1, WHITE)
@@ -237,7 +238,6 @@ def main():
 	else:
 		env.add_AI_player() # Simulation player
 
-
 	if replay:
 		env.add_player() # Player since we want everything to be entered manually
 	else:
@@ -286,7 +286,7 @@ def main():
 				env.handle_game_stage()
 			
 		# At Showdown, reveal opponent's cards and add a delay
-		if replay:
+		if replay or user_input:
 			draw_window(env, god_mode, user_input)
 
 		if user_input and env.end_of_round():

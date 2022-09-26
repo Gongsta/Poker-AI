@@ -2,6 +2,8 @@ import unittest
 import os
 import sys
 import shutil
+import treys
+from tqdm import tqdm
 
 
 if __name__ == "__main__":
@@ -478,6 +480,52 @@ class UnitTests(unittest.TestCase):
 		evaluator.add_hands(hand, hand2)
 		self.assertEqual(evaluator.get_winner(), [0,1])
 
+	def test_with_treys(self):
+		# Use the treys library to test that our hand evaluator is always correct
+		deck = Deck()
+		treys_evaluator = treys.Evaluator()
+		for i in tqdm(range(250000)):
+			deck.reset_deck()
+			board = []
+			treys_board = []
+			player = []
+			treys_player = []
+			opponent = []
+			treys_opponent = []
+			for _ in range(2):
+				card = deck.draw()
+				player.append(card)
+				treys_player.append(treys.Card.new(card.to_treys()))
+			
+			for _ in range(2):
+				card = deck.draw()
+				opponent.append(card)
+				treys_opponent.append(treys.Card.new(card.to_treys()))
+
+			for _ in range(5):
+				card = deck.draw()
+				board.append(card)
+				treys_board.append(treys.Card.new(card.to_treys()))
+			
+			evaluator = Evaluator()
+			evaluator.add_hands(CombinedHand(player+board), CombinedHand(opponent+board))
+			p1_score = treys_evaluator.evaluate(treys_board, treys_player)
+			p2_score = treys_evaluator.evaluate(treys_board, treys_opponent)
+			if p1_score < p2_score:
+				treys_winner = [0]
+			elif p1_score > p2_score:
+				treys_winner = [1]
+			else:
+				treys_winner = [0,1]
+
+			if (evaluator.get_winner() != treys_winner): # In the case of errors
+				for hand in evaluator.hands:
+					print(hand.comparator)
+				
+				print(evaluator)
+
+			self.assertEqual(evaluator.get_winner(), treys_winner)
+		
 class IntegrationTests(unittest.TestCase):
 
 	def test_environment(self):

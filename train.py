@@ -21,6 +21,7 @@ Starting off with simple training, we have the following 3 actions:
 """
 NUM_ACTIONS = 3 
 nodeMap = {}
+startIterations = 0
 
 class Node:
 	def __init__(self) -> None:
@@ -78,8 +79,6 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 	
 	To compare cards, we get the binary representation.
 	"""
-	print(p0, p1)
-	
 	# print(history.history_str)
 	plays = len(history.history_str)
 	player = plays % 2
@@ -110,12 +109,6 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 			winners = evaluator.get_winner()
 			# print("Showdown time! Winner(s):", winners)
 			
-			# if (len(winners) == 0):
-			# 	print("Curent Hand", len(hand), str(hand))
-			# 	print("Opponent Hand", str(opponent_hand))
-			# 	print("Community Cards", str(community_cards))
-				# print(str(community_cards))
-
 			assert(len(winners) > 0) # At least one winner
 
 			if len(winners) == 2: # Tie
@@ -191,10 +184,12 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 		node.regretSum[a] += (p1 if player == 0 else p0) * regret
 	return nodeUtil
 
-def train(iterations):
+
+
+def train(iterations, save=True):
 	deck = Deck()
 	util = 0
-	for i in tqdm(range(iterations), desc="Training Loop"):
+	for i in tqdm(range(startIterations, iterations), desc="Training Loop"):
 		deck.reset_deck()
 		player_cards = CombinedHand([deck.draw(), deck.draw()])
 		opponent_cards = CombinedHand([deck.draw(), deck.draw()])
@@ -211,7 +206,11 @@ def train(iterations):
 		util += cfr(all_community_cards,private_cards,community_cards,history,1,1)
 		if (i % 1 == 0):
 			print("Average game value: ", util/i)
-	
+
+		if save and i % 500 == 0:
+			joblib.dump(nodeMap, "HoldemNodeMap.joblib")
+			joblib.dump(all_history, "HoldemTrainingHistory.joblib")
+			joblib.dump(i, "startIterations.joblib")
 	
 if __name__ == "__main__":
 	train_from_scratch = True # Set this to True if you want to retrain from scratch
@@ -219,21 +218,30 @@ if __name__ == "__main__":
 	parser.add_argument("-s", "--save",
                     action="store_true", dest="save", default=True,
                     help="Save the trained model and history")
+	parser.add_argument("-l", "--load",
+                    action="store_true", dest="load", default=False,
+                    help="Load the trained model and history to resume training")
 	parser.add_argument("-v", "--visualize",
                     action="store_true", dest="visualize", default=False,
-                    help="Print out all information sets with their corresponding strategy.")
+                    help="Print out all information sets with their corresponding strategy. Do NOT train")
 
 	args = parser.parse_args()
-	save = args.save
+	save = args.save # Save history and information set
+	load = args.load
 	visualize = args.visualize
-	if not visualize:
-		train(10)
-		if save:
-			joblib.dump(nodeMap, "HoldemNodeMap.joblib")
-			joblib.dump(all_history, "HoldemTrainingHistory.joblib")
-	else:
+	if load:
 		nodeMap = joblib.load("HoldemNodeMap.joblib")
+		history = joblib.load("HoldemTrainingHistory.joblib")
+		startIterations = joblib.load("startIterations.joblib")
 
+		assert(len(nodeMap) > 0)
+		assert(len(history) > 0)
+		assert(startIterations > 0)
+
+	if not visualize:
+		train(1000000, save)
+
+	nodeMap = joblib.load("HoldemNodeMap.joblib") # Load information sets
 	print("Total Number of Infosets:", len(nodeMap))
 	for infoset in nodeMap:
 		nodeMap[infoset].describe()

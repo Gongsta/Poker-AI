@@ -53,6 +53,10 @@ CARD_BIT_SUITS_DICT = {1: "Clubs", 2: "Diamonds", 4: "Hearts", 8: "Spades"}
 CARD_RANKS = [i for i in range(2, 15)] # Jack = 11, Queen = 12, King = 13, IMPORTANT: Ace = 14 since we use that for sorting
 CARD_SUITS = ["Clubs", "Diamonds", "Hearts","Spades"] 
 
+TREYS_SUITS = {"Clubs": "c", "Diamonds":"d", "Hearts":"h","Spades": "s"}
+TREYS_RANKS = {14: "A", 2: "2", 3: "3", 4:"4", 5:"5", 6:"6",
+			7:"7", 8:"8", 9:"9", 10:"T", 11: "J", 12: "Q", 13: "K"}
+
 RANK_KEY = {"A": 14, "2": 2, "3": 3, "4":4, "5":5, "6":6,
 			"7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K":13}
 
@@ -90,6 +94,9 @@ class Card():
 	@property
 	def suit(self):
 		return self.__suit
+	
+	def to_treys(self): # Helper function to print in a treys friendly format
+		return TREYS_RANKS[self.rank] + TREYS_SUITS[self.suit]
 
 	@property
 	def idx(self):
@@ -225,7 +232,6 @@ class CombinedHand:
 		h = self.h >> 4 # Ignore the first 4 aces
 		hh = (h) & (h >> 1) & (h >> 2) & (h >> 3) & BIT_MASK_1
 		if hh:
-			print("four of a kind", len(bin(hh)) - 2, bin(hh))
 			four_of_a_kind = BIT_POSITION_TABLE[hh]//4 + 2
 			self.hand_strength = 3
 			kicker = 0
@@ -406,7 +412,6 @@ class CombinedHand:
 			
 		return twos
 	
-	
 
 class Evaluator:
 	def __init__(self):
@@ -419,13 +424,19 @@ class Evaluator:
 	def clear_hands(self):
 		self.hands = []
 	
+	def __str__(self):
+		ans = ""
+		for hand in self.hands:
+			ans += str(hand) + " "
+			ans += '\n'
+		return ans
+	
 	def get_winner(self) -> List[int]: # Return a list of 0-indexed of players who won the pot. If multiple, then split
 		for hand in self.hands:
 			hand.get_hand_strength()
 		hand_strengths = [hand.hand_strength for hand in self.hands]
 		best_hand_val = min(hand_strengths)
 		potential_winners = [i for i, x in enumerate(hand_strengths) if x == best_hand_val]
-		
 		
 		# TODO: Idea to optimize in the future, just make the best hand as a list, and then compare if necessary.
 		
@@ -466,9 +477,13 @@ class Evaluator:
 				
 				winners = []
 				for winner in potential_winners:
-					if (self.hands[winner].comparator[0] == highest_threes and self.hands[winner].comparator[1] == highest_twos):
+					if (self.hands[winner].comparator[0] == highest_threes and self.hands[winner].comparator[1] == highest_twos): # Pick player with best full house
 						winners.append(winner)
 				
+				if (len(winners) ==0): # Edge case when we have full house over full house
+					for winner in potential_winners:
+						if (self.hands[winner].comparator[0] == highest_threes):
+							winners.append(winner)
 				return winners
 
 			elif best_hand_val == 5: # Flush
