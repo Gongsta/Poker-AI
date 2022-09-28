@@ -203,9 +203,6 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 			raise_bet = BET_BUTTON_FONT.render("Raise", 1, WHITE)
 			WIN.blit(raise_bet, (797, 450))
 
-
-
-
 	pygame.display.update()
 
 def main():
@@ -272,15 +269,22 @@ def main():
 		
 		if not handler_called:
 			if replay:
-				print(history[game])
-				env.handle_game_stage(history[game][game_i])
+				if game_i == 0: # New game, update player's hands
+					# TODO: Show the appropriate community cards. Right now it shows the right player cards, but the board is still the old way.
+					# TODO: This is a little buggy right now too. It doesn't show the right cards.
+					env.players[0].hand = [Card(rank_suit=history[game]["player_cards"][0]), Card(rank_suit=history[game]["player_cards"][1])]
+					env.players[1].hand = [Card(rank_suit=history[game]["opponent_cards"][0]), Card(rank_suit=history[game]["opponent_cards"][1])]
+
+				env.handle_game_stage(history[game]["history"][game_i])
 				game_i += 1
-				if game_i >= len(history[game]): # Move onto the next game
+				if game_i >= len(history[game]["history"]): # Move onto the next game
+					print("Finished game with history: {}. Player: {} Opponent: {} Board: {}".format(history[game]["history"], history[game]["player_cards"], history[game]["opponent_cards"], history[game]["community_cards"]))
 					game += 1
 					game_i = 0
 					if (game == len(history)): 
 						print("Finished replay of all games")
 						return
+
 
 			else:
 				env.handle_game_stage()

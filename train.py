@@ -87,12 +87,12 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 	# Return payoff for terminal states
 	if (plays >= 1):
 		if history.history_str[-1] == 'f': # Fold, just calculate total value
-			all_history.append(history.history_str)
+			all_history.append({"history": history.history_str, "player_cards": private_cards[0].as_list(), "opponent_cards": private_cards[1].as_list(), "community_cards": [str(x) for x in all_community_cards]})
 			return history.total_pot_size
 		
 		elif history.game_stage == 6:
 			# Showdown
-			all_history.append(history.history_str)
+			all_history.append({"history": history.history_str, "player_cards": private_cards[0].as_list(), "opponent_cards": private_cards[1].as_list(), "community_cards": [str(x) for x in all_community_cards]})
 			hand = copy.deepcopy(CombinedHand())
 			hand.add_combined_hands(community_cards, private_cards[player])
 
@@ -186,6 +186,7 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 
 
 
+averageUtils = []
 def train(iterations, save=True):
 	deck = Deck()
 	util = 0
@@ -206,11 +207,12 @@ def train(iterations, save=True):
 		util += cfr(all_community_cards,private_cards,community_cards,history,1,1)
 		if (i % 1 == 0):
 			print("Average game value: ", util/i)
+			averageUtils.append(util/i)
 
-		if save and i % 500 == 0:
+		if save and i % 100 == 0:
 			joblib.dump(nodeMap, "HoldemNodeMap.joblib")
 			joblib.dump(all_history, "HoldemTrainingHistory.joblib")
-			joblib.dump(i, "startIterations.joblib")
+			joblib.dump(averageUtils, "averageUtils.joblib")
 	
 if __name__ == "__main__":
 	train_from_scratch = True # Set this to True if you want to retrain from scratch
@@ -232,7 +234,7 @@ if __name__ == "__main__":
 	if load:
 		nodeMap = joblib.load("HoldemNodeMap.joblib")
 		history = joblib.load("HoldemTrainingHistory.joblib")
-		startIterations = joblib.load("startIterations.joblib")
+		averageUtils = joblib.load("averageUtils.joblib")
 
 		assert(len(nodeMap) > 0)
 		assert(len(history) > 0)

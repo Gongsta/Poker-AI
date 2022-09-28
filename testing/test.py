@@ -495,17 +495,17 @@ class UnitTests(unittest.TestCase):
 			for _ in range(2):
 				card = deck.draw()
 				player.append(card)
-				treys_player.append(treys.Card.new(card.to_treys()))
+				treys_player.append(treys.Card.new(str(card)))
 			
 			for _ in range(2):
 				card = deck.draw()
 				opponent.append(card)
-				treys_opponent.append(treys.Card.new(card.to_treys()))
+				treys_opponent.append(treys.Card.new(str(card)))
 
 			for _ in range(5):
 				card = deck.draw()
 				board.append(card)
-				treys_board.append(treys.Card.new(card.to_treys()))
+				treys_board.append(treys.Card.new(str(card)))
 			
 			evaluator = Evaluator()
 			evaluator.add_hands(CombinedHand(player+board), CombinedHand(opponent+board))

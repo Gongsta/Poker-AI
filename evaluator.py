@@ -53,28 +53,29 @@ CARD_BIT_SUITS_DICT = {1: "Clubs", 2: "Diamonds", 4: "Hearts", 8: "Spades"}
 CARD_RANKS = [i for i in range(2, 15)] # Jack = 11, Queen = 12, King = 13, IMPORTANT: Ace = 14 since we use that for sorting
 CARD_SUITS = ["Clubs", "Diamonds", "Hearts","Spades"] 
 
-TREYS_SUITS = {"Clubs": "c", "Diamonds":"d", "Hearts":"h","Spades": "s"}
-TREYS_RANKS = {14: "A", 2: "2", 3: "3", 4:"4", 5:"5", 6:"6",
+RANK_KEY = {"A": 14, "2": 2, "3": 3, "4":4, "5":5, "6":6, # Supports both "T" and "10" as 10
+			"7": 7, "8": 8, "9": 9, "T": 10, "10":10, "J": 11, "Q": 12, "K":13} 
+
+# INVERSE_RANK_KEY = {14: "A", 2: "02", 3: "03", 4:"04", 5:"05", 6:"06",
+# 			7:"07", 8:"08", 9:"09", 10:"10", 11: "J", 12: "Q", 13: "K"}
+
+INVERSE_RANK_KEY = {14: "A", 2: "2", 3: "3", 4:"4", 5:"5", 6:"6",
 			7:"7", 8:"8", 9:"9", 10:"T", 11: "J", 12: "Q", 13: "K"}
 
-RANK_KEY = {"A": 14, "2": 2, "3": 3, "4":4, "5":5, "6":6,
-			"7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K":13}
+SUIT_KEY = {"c": "Clubs", "d": "Diamonds", "h":"Hearts","s": "Spades"}
 
-INVERSE_RANK_KEY = {14: "A", 2: "02", 3: "03", 4:"04", 5:"05", 6:"06",
-			7:"07", 8:"08", 9:"09", 10:"10", 11: "J", 12: "Q", 13: "K"}
-
-SUIT_KEY = {"C": "Clubs", "D": "Diamonds", "H":"Hearts","S": "Spades"}
 
 class Card():
 	# Immutable after it has been initialized
-	def __init__(self, rank=1, suit="Spades", rank_suit=None, generate_random=False) -> None:
+	def __init__(self,rank=14, suit="Spades", rank_suit=None, generate_random=False) -> None:
 
 		if rank_suit: # Ex: "KD" (King of diamonds), "10H" (10 of Hearts),
-			self.__suit = SUIT_KEY[rank_suit[-1]]
 			self.__rank = RANK_KEY[rank_suit[:-1]]
+			self.__suit = SUIT_KEY[rank_suit[-1].lower()]
 
 		else:
 			self.__rank = rank
+			assert(self.__rank >= 2 and self.__rank <= 14)
 			self.__suit = suit
 		
 		if generate_random: # If we want to just generate a random card
@@ -95,9 +96,6 @@ class Card():
 	def suit(self):
 		return self.__suit
 	
-	def to_treys(self): # Helper function to print in a treys friendly format
-		return TREYS_RANKS[self.rank] + TREYS_SUITS[self.suit]
-
 	@property
 	def idx(self):
 		"""
@@ -111,8 +109,8 @@ class Card():
 		rank -= 1
 		return rank*4 + CARD_SUITS_DICT[self.__suit]
 	
-	def __str__(self):
-		return  str(self.rank) + " of " + self.suit
+	def __str__(self): # Following the Treys format of printing
+		return INVERSE_RANK_KEY[self.rank] + self.suit[0].lower()
 	
 
 class Deck():
@@ -160,6 +158,15 @@ class CombinedHand:
 		
 		return s
 	
+	def as_list(self):
+		# Save hand as a linary of characters
+		s = []
+		for h in self.hand:
+			s.append(str(h))
+		
+		return s
+		
+
 	def __len__(self):
 		return len(self.hand)
 

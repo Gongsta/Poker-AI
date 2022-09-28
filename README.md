@@ -49,10 +49,11 @@ How to evaluate the performance of the Poker AI? There are 3 main ways to measur
 - [x] Write the vanilla CFR code for Kuhn Poker
 - [x] Store weights of the trained algorithm
 	- Look into `joblib`, `pickle` (slower)
-- [ ] Visualize the performance of CFR, and start increasing the amount of cards
-- [ ] Create framework to play against the AI that is trained
-- [ ] Implement Monte-Carlo CFR for Kuhn Poker
-- [ ] Implement Deep CFR for Kuhn Poker
+- [x] Visualize the performance of CFR, and start increasing the amount of cards
+- [x] Create framework to play against the AI that is trained
+- [x] Implement Monte-Carlo CFR for Kuhn Poker
+- [x] Implement Deep CFR for Kuhn Poker
+
 
 
 ##### 3. Implement the AI for No Limit Texas Hold-Em
@@ -61,3 +62,6 @@ How to evaluate the performance of the Poker AI? There are 3 main ways to measur
 - [ ] Implement Monte-Carlo CFR
 - [ ] Implement a distributed version of Monte-Carlo CFR
 - [ ] Implement sub-game solving to come up with better strategies during the actual game (key idea presented by Noam Brown. Seach during the game drastically improves performance)
+
+##### 4. Future Steps
+- [ ] Implement Computer Vision + Deep Learning to recognize Poker cards, and so you can deploy this model in real life by mounting a camera to your head.
