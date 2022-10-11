@@ -12,9 +12,7 @@ class Player(): # This is the POV
 
 		self.playing_current_round = True
 		
-
 	# Wellformedness, hand is always either 0 or 2 cards
-	
 	def add_card_to_hand(self, card: Card):
 		self.hand.append(card)
 		assert(len(self.hand) <= 2)

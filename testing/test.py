@@ -38,34 +38,34 @@ class UnitTests(unittest.TestCase):
 		assert(new_deck.total_remaining_cards == 52)
 		
 	def test_combinedHand(self):
-		a = Card(rank_suit="2C")
-		b = Card(rank_suit="2D")
-		c = Card(rank_suit="2H")
-		d = Card(rank_suit="2S")
+		a = Card(rank_suit="2c")
+		b = Card(rank_suit="2d")
+		c = Card(rank_suit="2h")
+		d = Card(rank_suit="2s")
 		hand = [a, b, c, d]
 		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b11110000')
 
-		a = Card(rank_suit="AC")
-		b = Card(rank_suit="AD")
-		c = Card(rank_suit="AH")
-		d = Card(rank_suit="AS")
+		a = Card(rank_suit="Ac")
+		b = Card(rank_suit="Ad")
+		c = Card(rank_suit="Ah")
+		d = Card(rank_suit="As")
 		hand = [a, b, c, d]
 		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b11110000000000000000000000000000000000000000000000001111')
 
-		a = Card(rank_suit="2C")
-		b = Card(rank_suit="3C")
-		c = Card(rank_suit="4C")
-		d = Card(rank_suit="5C")
+		a = Card(rank_suit="2c")
+		b = Card(rank_suit="3c")
+		c = Card(rank_suit="4c")
+		d = Card(rank_suit="5c")
 		hand = [a, b, c, d]
 		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b10001000100010000')
 
-		a = Card(rank_suit="AC")
-		b = Card(rank_suit="2S")
-		c = Card(rank_suit="4S")
-		d = Card(rank_suit="5S")
+		a = Card(rank_suit="Ac")
+		b = Card(rank_suit="2s")
+		c = Card(rank_suit="4s")
+		d = Card(rank_suit="5s")
 		hand = [a, b, c, d]
 		evaluator = CombinedHand(hand)
 		
@@ -77,14 +77,14 @@ class UnitTests(unittest.TestCase):
 		
 	def test_royal_flush(self):
 		# Royal Flush of Hearts
-		a = Card(rank_suit="AH")
-		b = Card(rank_suit="KH")
-		c = Card(rank_suit="JH")
-		d = Card(rank_suit="QH")
-		e = Card(rank_suit="10H")
-		f = Card(rank_suit="9S") 
-		g = Card(rank_suit="2C")
-		h = Card(rank_suit="3C")
+		a = Card(rank_suit="Ah")
+		b = Card(rank_suit="Kh")
+		c = Card(rank_suit="Jh")
+		d = Card(rank_suit="Qh")
+		e = Card(rank_suit="10h")
+		f = Card(rank_suit="9s") 
+		g = Card(rank_suit="2c")
+		h = Card(rank_suit="3c")
 		hand1 = [a,b,c,d,e,f,g]
 		hand2 = [a,b,c,d,e,f,h]
 		hand1 = CombinedHand(hand1)
@@ -103,23 +103,23 @@ class UnitTests(unittest.TestCase):
 	
 	def test_royal_flush2(self):
 		# Royal Flush of Hearts
-		a = Card(rank_suit="AH")
-		b = Card(rank_suit="KH")
-		c = Card(rank_suit="JH")
-		d = Card(rank_suit="QH")
-		e = Card(rank_suit="10H")
-		f = Card(rank_suit="9S") 
-		g = Card(rank_suit="2C")
+		a = Card(rank_suit="Ah")
+		b = Card(rank_suit="Kh")
+		c = Card(rank_suit="Jh")
+		d = Card(rank_suit="Qh")
+		e = Card(rank_suit="10h")
+		f = Card(rank_suit="9s") 
+		g = Card(rank_suit="2c")
 
 		hand1 = [a,b,c,d,e,f,g]
 		# Royal Flush of Spades (this wouldn't happen in a real match)
-		a = Card(rank_suit="AS")
-		b = Card(rank_suit="KS")
-		c = Card(rank_suit="JS")
-		d = Card(rank_suit="QS")
-		e = Card(rank_suit="10S")
-		f = Card(rank_suit="9S") 
-		g = Card(rank_suit="2C")
+		a = Card(rank_suit="As")
+		b = Card(rank_suit="Ks")
+		c = Card(rank_suit="Js")
+		d = Card(rank_suit="Qs")
+		e = Card(rank_suit="10s")
+		f = Card(rank_suit="9s") 
+		g = Card(rank_suit="2c")
 		hand2 = [a,b,c,d,e,f,g]
 		hand1 = CombinedHand(hand1)
 		hand2 = CombinedHand(hand2)
@@ -129,14 +129,14 @@ class UnitTests(unittest.TestCase):
 		self.assertEqual(evaluator.get_winner(), [0,1])
 
 	def test_straight_flush(self):
-		a = Card(rank_suit="4S")
-		b = Card(rank_suit="5S")
-		c = Card(rank_suit="JH")
-		d = Card(rank_suit="6S")
-		e = Card(rank_suit="10H")
-		f = Card(rank_suit="7S") 
-		g = Card(rank_suit="8S")
-		h = Card(rank_suit="9S")
+		a = Card(rank_suit="4s")
+		b = Card(rank_suit="5s")
+		c = Card(rank_suit="Jh")
+		d = Card(rank_suit="6s")
+		e = Card(rank_suit="10h")
+		f = Card(rank_suit="7s") 
+		g = Card(rank_suit="8s")
+		h = Card(rank_suit="9s")
 		hand1 = [a,b,c,d,e,f,g]
 		hand2 = [a,b,h,d,e,f,g]
 		hand3 = [a,b,c,d,e,f,g]
@@ -163,13 +163,13 @@ class UnitTests(unittest.TestCase):
 		self.assertEqual(evaluator.get_winner(), [0, 1])
 
 	def test_four_of_a_kind(self):
-		a = Card(rank_suit="4S")
-		b = Card(rank_suit="6C")
-		c = Card(rank_suit="JH")
-		d = Card(rank_suit="6S")
-		e = Card(rank_suit="10H")
-		f = Card(rank_suit="6D") 
-		g = Card(rank_suit="6H")
+		a = Card(rank_suit="4s")
+		b = Card(rank_suit="6c")
+		c = Card(rank_suit="Jh")
+		d = Card(rank_suit="6s")
+		e = Card(rank_suit="10h")
+		f = Card(rank_suit="6d") 
+		g = Card(rank_suit="6h")
 		hand1 = [a,b,c,d,e,f,g]
 		hand1 = CombinedHand(hand1)
 		hand1.get_hand_strength()
@@ -177,13 +177,13 @@ class UnitTests(unittest.TestCase):
 		self.assertEqual(hand1.comparator, [6, 11]) # Four cards of six + Jack Kicker
 	
 		# Check for ties
-		a = Card(rank_suit="4S")
-		b = Card(rank_suit="AC")
-		c = Card(rank_suit="JH")
-		d = Card(rank_suit="AS")
-		e = Card(rank_suit="10H")
-		f = Card(rank_suit="AD") 
-		g = Card(rank_suit="AH")
+		a = Card(rank_suit="4s")
+		b = Card(rank_suit="Ac")
+		c = Card(rank_suit="Jh")
+		d = Card(rank_suit="As")
+		e = Card(rank_suit="10h")
+		f = Card(rank_suit="Ad") 
+		g = Card(rank_suit="Ah")
 		hand2 = [a,b,c,d,e,f,g]
 		hand2 = CombinedHand(hand2)
 		hand2.get_hand_strength()
@@ -201,13 +201,13 @@ class UnitTests(unittest.TestCase):
 		
 	
 	def test_full_house(self):
-		a = Card(rank_suit="4S")
-		b = Card(rank_suit="4C")
-		c = Card(rank_suit="4H")
-		d = Card(rank_suit="2S")
-		e = Card(rank_suit="2H")
-		f = Card(rank_suit="AD") 
-		g = Card(rank_suit="7H")
+		a = Card(rank_suit="4s")
+		b = Card(rank_suit="4c")
+		c = Card(rank_suit="4h")
+		d = Card(rank_suit="2s")
+		e = Card(rank_suit="2h")
+		f = Card(rank_suit="Ad") 
+		g = Card(rank_suit="7h")
 		hand1 = [a,b,c,d,e,f,g]
 		hand1 = CombinedHand(hand1)
 		hand1.get_hand_strength()
@@ -216,9 +216,9 @@ class UnitTests(unittest.TestCase):
 		
 		
 		# Better Pair of threes (10s vs 4s)
-		a = Card(rank_suit="10S")
-		b = Card(rank_suit="10C")
-		c = Card(rank_suit="10H")
+		a = Card(rank_suit="10s")
+		b = Card(rank_suit="10c")
+		c = Card(rank_suit="10h")
 		hand2 = [a,b,c,d,e,f,g]
 		hand2 = CombinedHand(hand2)
 		evaluator = Evaluator()
@@ -228,8 +228,8 @@ class UnitTests(unittest.TestCase):
 
 
 		# Same Pair of Threes, better pair of twos
-		d = Card(rank_suit="3S")
-		e = Card(rank_suit="3H")
+		d = Card(rank_suit="3s")
+		e = Card(rank_suit="3h")
 		hand3 = [a,b,c,d,e,f,g]
 		hand3 = CombinedHand(hand3)
 
@@ -243,13 +243,13 @@ class UnitTests(unittest.TestCase):
 		
 		
 		# Edge Case: Two pairs of threes should still give full house
-		a = Card(rank_suit="4S")
-		b = Card(rank_suit="4C")
-		c = Card(rank_suit="4H")
-		d = Card(rank_suit="2S")
-		e = Card(rank_suit="2H")
-		f = Card(rank_suit="2D") 
-		g = Card(rank_suit="7H")
+		a = Card(rank_suit="4s")
+		b = Card(rank_suit="4c")
+		c = Card(rank_suit="4h")
+		d = Card(rank_suit="2s")
+		e = Card(rank_suit="2h")
+		f = Card(rank_suit="2d") 
+		g = Card(rank_suit="7h")
 		hand1 = [a,b,c,d,e,f,g]
 		hand1 = CombinedHand(hand1)
 		hand1.get_hand_strength()

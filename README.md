@@ -7,6 +7,15 @@ Personal notes:
 - Naming Convention: "Player" for us, "Opponent" for the enemy
 - Future ideas could be using this project as a personal poker trainer (displaying the pot odds). Can help you refine your game
 
+I have been incrementally developing the Poker bot, starting with Kuhn Poker which simply implements Vanilla CFR. Then, with Limit HOld'Em, I needed to use abstractions in order to compute a blueprint strategy. Rules for limit hold'em are explained [here](https://www.pokerlistings.com/limit-texas-holdem).
+
+I might need to write C++ code, since training on the Python code might take a very long time.
+
+Abstraction:
+- There are two common types of abstraction: information (i.e. cards) abstraction and action (i.e. bet size) abstraction. 
+
+For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in.
+
 
 ### Basic Explanations of the Game + Class Definitions
 Poker is a a family comparing card games in which players wager over which hand is best according to that specific game's rules in ways similar to these rankings. The goal of the game is to win as much money as possible. Unlike other games like Blackjack where players work together and try to beat the "house" (i.e. the casino), Poker is a game in which players try to beat each other.
@@ -55,13 +64,13 @@ How to evaluate the performance of the Poker AI? There are 3 main ways to measur
 - [x] Implement Deep CFR for Kuhn Poker
 
 
-
 ##### 3. Implement the AI for No Limit Texas Hold-Em
 - [ ] Calculate pot odds at different stages of the game (use this as a helper when people actually play the game)
-- [ ] Implement card abstraction to reduce the game size from $10^{161}$ to $10^{12}$ decision points looking at the Baby Tartanian8 impleeentation
+- [ ] Implement card abstraction to reduce the game size from $10^{161}$ to $10^{12}$ decision points looking at the Baby Tartanian8 implementation
 - [ ] Implement Monte-Carlo CFR
 - [ ] Implement a distributed version of Monte-Carlo CFR
 - [ ] Implement sub-game solving to come up with better strategies during the actual game (key idea presented by Noam Brown. Seach during the game drastically improves performance)
+
 
 ##### 4. Future Steps
 - [ ] Implement Computer Vision + Deep Learning to recognize Poker cards, and so you can deploy this model in real life by mounting a camera to your head.

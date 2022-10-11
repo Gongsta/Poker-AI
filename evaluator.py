@@ -99,7 +99,6 @@ class Card():
 	@property
 	def idx(self):
 		"""
-		Used for the RL part. We will represent the hand as a list of 52 binary integers.
 		[AC, AD, AH, AS, 2C, 2D, ... KH, KS]
 		0 .  1 . 2 . 3 . 4 . 5 .     50, 51  
 		"""

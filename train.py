@@ -1,7 +1,8 @@
 
 """
 Before looking at this code, you should probably familiarize with a simpler implementation
-with Kuhn Poker, under `research/kuhn/train.py`
+of CFR with Kuhn Poker, under `research/kuhn/train.py`. That version of the game 
+does not implement Card Abstraction. This version does.
 
 This is the main training file for Poker CFR.
 """
@@ -167,6 +168,7 @@ def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], comm
 			nextHistory.history_str += "r" # Bet/Raise
 			if (len(nextHistory.history_str) > 3) and nextHistory.history_str[-3:] == 'rrr': continue # To prevent infinite raises, we just don't consider this node
 			
+			# TODO: Change this, since this is not how limit hold'em works
 			if nextHistory.min_bet_size == 0:
 				nextHistory.min_bet_size = 1
 			else:
