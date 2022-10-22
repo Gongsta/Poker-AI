@@ -18,7 +18,7 @@ class UnitTests(unittest.TestCase):
 	
 	# Unit Testing
 	def test_card_initialization(self):
-		jackOfHearts = Card(11, "Hearts")
+		jackOfHearts = Card("JH")
 		self.assertEqual(jackOfHearts.rank, 11)
 		self.assertEqual(jackOfHearts.suit, "Hearts")
 		
@@ -38,23 +38,23 @@ class UnitTests(unittest.TestCase):
 		assert(new_deck.total_remaining_cards == 52)
 		
 	def test_combinedHand(self):
-		a = Card(rank_suit="2c")
-		b = Card(rank_suit="2d")
-		c = Card(rank_suit="2h")
-		d = Card(rank_suit="2s")
+		a = Card("2c")
+		b = Card("2d")
+		c = Card("2h")
+		d = Card("2s")
 		hand = [a, b, c, d]
 		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b11110000')
 
-		a = Card(rank_suit="Ac")
-		b = Card(rank_suit="Ad")
-		c = Card(rank_suit="Ah")
-		d = Card(rank_suit="As")
+		a = Card("Ac")
+		b = Card("Ad")
+		c = Card("Ah")
+		d = Card("As")
 		hand = [a, b, c, d]
 		evaluator = CombinedHand(hand)
 		self.assertEqual(evaluator.get_binary_representation(), '0b11110000000000000000000000000000000000000000000000001111')
 
-		a = Card(rank_suit="2c")
+		a = Card("2c")
 		b = Card(rank_suit="3c")
 		c = Card(rank_suit="4c")
 		d = Card(rank_suit="5c")
@@ -484,7 +484,7 @@ class UnitTests(unittest.TestCase):
 		# Use the treys library to test that our hand evaluator is always correct
 		deck = Deck()
 		treys_evaluator = treys.Evaluator()
-		for i in tqdm(range(250000)):
+		for i in tqdm(range(25000)):
 			deck.reset_deck()
 			board = []
 			treys_board = []

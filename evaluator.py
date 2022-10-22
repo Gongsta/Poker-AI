@@ -66,8 +66,14 @@ SUIT_KEY = {"c": "Clubs", "d": "Diamonds", "h":"Hearts","s": "Spades"}
 
 
 class Card():
+	"""
+	You can initialize cards two ways:
+	- (RECOMMENDED) Card("Ah")
+	- Card(10, "Spades")
+	
+	"""
 	# Immutable after it has been initialized
-	def __init__(self,rank=14, suit="Spades", rank_suit=None, generate_random=False) -> None:
+	def __init__(self,rank_suit=None, rank=14, suit="Spades", generate_random=False) -> None:
 
 		if rank_suit: # Ex: "KD" (King of diamonds), "10H" (10 of Hearts),
 			self.__rank = RANK_KEY[rank_suit[:-1]]
@@ -124,7 +130,7 @@ class Deck():
 		self.__cards = []
 		for rank in CARD_RANKS:
 			for suit in CARD_SUITS:
-				self.__cards.append(Card(rank, suit))
+				self.__cards.append(Card(rank=rank, suit=suit))
 		
 		random.shuffle(self.__cards)
 
