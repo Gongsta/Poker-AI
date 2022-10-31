@@ -1,4 +1,8 @@
-from pygame import *
+from pygame import Rect, Color, Surface, transform, SRCALPHA, draw, BLEND_RGBA_MIN, BLEND_RGBA_MAX
+
+"""
+PYGAME Helper Functions
+"""
 
 def AAfilledRoundedRect(surface,color, rect, radius=0.4):
     """

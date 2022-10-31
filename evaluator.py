@@ -4,7 +4,7 @@
 # https://www.codingthewheel.com/archives/poker-hand-evaluator-roundup
 
 """
-# Some thoughts, the evaluator is sgoing to be important because it determines the rules
+# Some thoughts, the evaluator is going to be important because it determines the rules
 # of the game. However, we won't give our AI this. The environment will simply 
 # feed the final reward, which is win or not win. 
 

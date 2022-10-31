@@ -13,7 +13,7 @@ hand2 = [Card.new("Ts"), Card.new("Th")]
 # hand = deck.draw(2)
 
 score = evaluator.evaluate(hand, board)
-print(score/ 7462) # 7462 is the WORST POSSIBLE SCORE
+print(score / 7462) # 7462 is the WORST POSSIBLE SCORE
 # cls = evaluator.get_rank_class(score)
 # print(cls)
 # print(evaluator.class_to_string(cls))
