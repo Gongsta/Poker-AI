@@ -16,6 +16,9 @@ def Deck():
 	return deck
 
 def get_player_score(player_cards, board=[]):
+	"""Wrapper for the evaluate_cards function by phevaluator.
+	
+	"""
 	assert(len(player_cards) == 2)
 	assert(len(board) <= 5)
 	# Returns a score using the phevaluator library

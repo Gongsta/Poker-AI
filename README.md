@@ -36,7 +36,9 @@ strategy profiles. That is simply not feasible. Hence, the first step is to find
 
 There are two common types of abstraction: information (i.e. cards) abstraction and action (i.e. bet size) abstraction. 
 
-For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. Card Abstractions are bucketed in 169 (pre-flop), 5000 (flop), 5000 (turn), and 5000 (river). 
+For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. 
+
+Card Abstractions are done by grouping hands with similar equity distributions into the same bucket/cluster/node. Equity is a measure of expected hand strength, which is your probability of winning given a uniform random rollout of community cards and random opponent private cards.The idea is based from this [paper](https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf), which talks about potential-aware and distribution aware card abstractions. In this project, cards are bucketed in 169 clusters (pre-flop), TBD (flop), TBD (turn), and TBD (river). 
 
 ### Concepts
 ##### Evaluating Performance
