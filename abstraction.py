@@ -11,6 +11,43 @@ they can be thought as sharing an abstract infoset".
 *Note on Card Abstraction: While I wrote my own Card and Deck object implements, it is simply too slow. Rather, working with string representation is much faster and memory-efficient.
 
 """
+from copy import deepcopy
+from typing import List
+import fast_evaluator
+from phevaluator import evaluate_cards
+import random
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+import time
+import numpy as np
+import os
+import glob
+import joblib
+
+"""
+BET ABSTRACTION
+"""
+# For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. 
+
+def bet_abstraction(bet_size):
+	"""Bet size is relative to pot.
+	
+	"""
+	if bet_size == 0:
+		return 'c'
+	elif bet_size <= 0.5:
+		return 0.5
+	elif bet_size <= 1.0:
+		return 1.0
+	elif bet_size <= 2.0:
+		return 2.0
+	else:
+		return 'all-in'
+
+
+"""
+CARD ABSTRACTION
+"""
 
 # Preflop Abstraction
 """
@@ -40,35 +77,18 @@ We can cluster hands using K-Means++ to cluster hands of similar distance.
 
 See this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
 """
-from copy import copy, deepcopy
-from typing import List
-import fast_evaluator
-from phevaluator import evaluate_cards
-import random
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-import json
-import time
 
-def calculate_equity(player_cards: List[str], community_cards=[], n=100, timer=False):
+def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=False):
 	if timer:
 		start_time = time.time()
 	wins = 0
-	initial_deck = fast_evaluator.Deck()
-	for card in player_cards:
-		initial_deck.remove(card)
-	for card in community_cards:
-		initial_deck.remove(card)
+	deck = fast_evaluator.Deck(excluded_cards=player_cards + community_cards)
+
 	for _ in range(n):
-		deck = deepcopy(initial_deck)
 		random.shuffle(deck)
-		opponent_cards = deck[:2]
-		final_community_cards = deepcopy(community_cards)
-		while len(final_community_cards) < 5:
-			final_community_cards.append(deck.pop())
-		
-		player_score = evaluate_cards(*(final_community_cards + player_cards))
-		opponent_score = evaluate_cards(*(final_community_cards + opponent_cards))
+		opponent_cards = deck[:2] # To avoid creating redundant copies
+		player_score = evaluate_cards(*(player_cards + community_cards + deck[2:2+(5 - len(community_cards))]))
+		opponent_score = evaluate_cards(*(opponent_cards + community_cards + deck[2:2+(5 - len(community_cards))]))
 		if player_score < opponent_score:
 			wins += 1
 		elif player_score == opponent_score:
@@ -86,22 +106,12 @@ def calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10
 	player_wins = 0
 	opponent_wins = 0
 
-	initial_deck = fast_evaluator.Deck()
-	for card in player_cards:
-		initial_deck.remove(card)
-	for card in opponent_cards:
-		initial_deck.remove(card)
-	for card in community_cards:
-		initial_deck.remove(card)
+	deck = fast_evaluator.Deck(excluded_cards=player_cards + opponent_cards + community_cards)
 	for _ in range(n):
-		deck = deepcopy(initial_deck)
 		random.shuffle(deck)
-		final_community_cards = deepcopy(community_cards)
-		while len(final_community_cards) < 5:
-			final_community_cards.append(deck.pop())
-		
-		player_score = evaluate_cards(*(final_community_cards + player_cards))
-		opponent_score = evaluate_cards(*(final_community_cards + opponent_cards))
+		player_score = evaluate_cards(*(player_cards + community_cards + deck[0:(5 - len(community_cards))]))
+		opponent_score = evaluate_cards(*(opponent_cards + community_cards + deck[0:(5 - len(community_cards))]))
+
 		if player_score < opponent_score:
 			player_wins += 1
 		elif player_score == opponent_score:
@@ -113,9 +123,14 @@ def calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10
 			
 	return player_wins / n, opponent_wins / n
 
-def calculate_equity_distribution(player_cards: List[str], community_cards=[], buckets=5, n=200, timer=False):
+def calculate_equity_distribution(player_cards: List[str], community_cards=[], bins=5, n=100, timer=True):
 	"""
-	buckets = # of numbers for the histrogram
+	n = # of cards to sample from the next round to generate this distribution.
+	
+	There is a tradeoff between the execution speed and variance of the values calculated, since
+	we are using a monte-carlo method to calculate those equites. In the end, I found a bin=5, n=100 
+	and rollouts using 100 values to be a good approximation. We won't be using this method for 
+	pre-flop, since we can have a lossless abstraction of that method anyways.
 	
 	The equity distribution is a better way to represent the strength of a given hand. It represents
 	how well a given hand performs over various profiles of community cards. We can calculate
@@ -123,37 +138,29 @@ def calculate_equity_distribution(player_cards: List[str], community_cards=[], b
 	
 	if we want to generate a distribution for the EHS of the turn (so we are given our private cards + 3 community cards), 
 	we draw various turn cards, and calculate the equity using those turn cards.  
-	If we find for a given turn card that its equity is 0.645, and we have 10 buckets, we would increment the bucket 0.60-0.70 by one. 
+	If we find for a given turn card that its equity is 0.645, and we have 10 bins, we would increment the bin 0.60-0.70 by one. 
 	We repeat this process until we get enough turn card samples.
 
 	"""
 	if timer:
 		start_time = time.time()
-	equity_hist = [0 for _ in range(buckets)] # histogram of equities, where equity[i] represents the probability of the i-th bucket
+	equity_hist = [0 for _ in range(bins)] # histogram of equities, where equity[i] represents the probability of the i-th bin
 	
 	assert(len(community_cards) != 1 and len(community_cards) != 2)
 
-	initial_deck = fast_evaluator.Deck()
-	for card in player_cards:
-		initial_deck.remove(card)
-	for card in community_cards:
-		initial_deck.remove(card)
+	deck = fast_evaluator.Deck(excluded_cards=player_cards + community_cards)
 
 	for i in range(n):
-		deck = deepcopy(initial_deck)
 		random.shuffle(deck)
-		bucket_community_cards = deepcopy(community_cards)
-		if len(community_cards) == 0: # We are calculating Flop Equity
-			bucket_community_cards.extend([deck.pop(), deck.pop(), deck.pop()])
-		elif len(community_cards) < 5: # Turn / River Equity
-			bucket_community_cards.append(deck.pop())
+		if len(community_cards) == 0:
+			score = calculate_equity(player_cards, community_cards + deck[:3], n=200)
+		else:
+			score = calculate_equity(player_cards, community_cards + deck[:1], n=100)
 
-		score = calculate_equity(player_cards, bucket_community_cards)
-
-		equity_hist[min(int(score * buckets), buckets-1)] += 1.0 # Score of the closest bucket is incremented by 1
+		equity_hist[min(int(score * bins), bins-1)] += 1.0 # Score of the closest bucket is incremented by 1
 	
 	# Normalize the equity so that the probability mass function (p.m.f.) of the distribution sums to 1
-	for i in range(buckets):
+	for i in range(bins):
 		equity_hist[i] /= n
 	
 	if timer:
@@ -195,22 +202,8 @@ overlapping, so you always end up in one.
 4. For pre-flop, generate 169 clusters (lossless abstraction).
 
 """
-
-def cluster_hands(n_clusters: int, total_community_cards=3):
-	kmeans = KMeans(n_clusters=n_clusters)
-	initial_deck = fast_evaluator.Deck()
-	X = []
-	
-	for _ in range(5000):
-		deck = random.shuffle(initial_deck)
 		
-		player_cards = deck[:2]
-		community_cards = deck[2:2+total_community_cards]
-		
-		X.append(calculate_equity_distribution(player_cards, community_cards))
-
-		
-def generate_preflop_clusters(): # Lossless abstraction for pre-flop, 169 buckets
+def generate_preflop_clusters(): # Lossless abstraction for pre-flop, 169 clusters
 	preflop_clusters = {}
 	cluster_i = 0
 	for rank in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"]:
@@ -229,6 +222,64 @@ def generate_preflop_clusters(): # Lossless abstraction for pre-flop, 169 bucket
 
 	return preflop_clusters
 
+def create_abstraction_folders():
+	if not os.path.exists('data'):
+		for split in ['clusters', 'raw']:
+			for stage in ['flop', 'turn', 'river']:
+				os.makedirs(f'data/{split}/{stage}')
+
+
+def generate_postflop_equity_distributions(n=1000, bins=5, save=True, stage=None, timer=True): # Lossful abstraction for flop, turn and river
+	if timer:
+		start_time = time.time()
+	assert(stage is None or stage == 'flop' or stage == 'turn' or stage == 'river')
+	equity_distributions = []
+	hands = []
+	
+	
+	if stage is None:
+		generate_postflop_equity_distributions(n, save, stage='flop')
+		# generate_postflop_clusters(n_clusters, save, stage='turn')
+		# generate_postflop_clusters(n_clusters, save, stage='river')
+	elif stage == 'flop':
+		num_community_cards = 3
+	elif stage == 'turn':
+		num_community_cards = 4
+	elif stage == 'river':
+		num_community_cards = 5
+	
+	deck = fast_evaluator.Deck()
+	for i in range(n):
+		random.shuffle(deck)
+		
+		player_cards = deck[:2]
+		community_cards = deck[2:2+num_community_cards]
+		distribution = calculate_equity_distribution(player_cards, community_cards, bins)
+		equity_distributions.append(distribution)
+		hands.append(' '.join(player_cards + community_cards))
+		
+		print("iteration: ", i)
+	
+	assert(len(equity_distributions) == len(hands))
+
+	equity_distributions = np.array(equity_distributions)
+	if save:
+		create_abstraction_folders()
+		file_id = int(time.time()) # Use the time as the file_id
+		with open(f'data/raw/{stage}/{file_id}.npy', 'wb') as f:
+			np.save(f, equity_distributions)
+		joblib.dump(hands, f'data/raw/{stage}/{file_id}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
+	
+	
+def cluster_equity_distributions_with_kmeans(n_clusters=100, data=None):
+	kmeans = KMeans(n_clusters=n_clusters).fit(data)
+	return kmeans.cluster_centers_
+
+
+
+def visualize_clustering():
+	# TODO: Visualize the clustering by actually seeing how the distributions shown
+	return
 
 def approximate_EMD(xn, m, sorted_distances, ordered_clusters):
 	"""Algorithm for efficiently approximating EMD, from 10.1609/aaai.v28i1.8816. Don't know if I am actually going to use this.
@@ -269,19 +320,58 @@ def approximate_EMD(xn, m, sorted_distances, ordered_clusters):
 				done[j] = True
 	return total_cost
 		
-def visualize_clustering():
-	# TODO: Visualize the clustering by actually seeing how the distributions shown
-	return
+
+def get_filenames(folder, extension='.npy'):
+	filenames = []
+	
+	for path in glob.glob(os.path.join(folder, '*' + extension)):
+		# Extract the filename
+		filename = os.path.split(path)[-1]        
+		filenames.append(filename)
+
+	return filenames
+
 
 if __name__ == "__main__":
-	opponent_cards = []
+	# stage = 'turn'
+	# generate = False
+	# clustering = False
+	# if generate:
+	# 	generate_postflop_equity_distributions(stage=stage)
+	
+	# if clustering:
+	# 	raw_dataset_filenames = get_filenames(f'data/raw/{stage}')
+	# 	filename = raw_dataset_filenames.sort()[-1] # Take the most recently generated dataset to run our clustering on
+		
+	# 	equity_distributions = np.load(f'data/raw/{stage}/{filename}')
+	# 	if not os.path.exists(f'data/clusters/{stage}/{filename}'):
+	# 		print(f"Generating the cluster for the {stage}")
+	# 		centroids = cluster_equity_distributions_with_kmeans(equity_distributions)
+	# 		with open(f'data/raw/{stage}/{filename}', 'wb') as f:
+	# 			np.save(f, centroids)
+	# 	else:
+	# 		centroids = joblib.load(f'data/clusters/{stage}/{filename}')
+		
+
+
+		# Visualization
+		# for i in range(equity_distributions.shape[0]):
+		# 	plot_equity_hist(equity_distributions[i])
+
+		# Clustering
+		
+
+		
+	# opponent_cards = []
 	
 	deck = fast_evaluator.Deck()
 
+
 	random.shuffle(deck)
 	player_cards = deck[:2]
+	# player_cards = ['Kc', 'Qc']
 	community_cards = deck[2:5]
-
+	# community_cards = []
 	for _ in range(5000):
 		equity_hist = calculate_equity_distribution(player_cards, community_cards)
 		plot_equity_hist(equity_hist, player_cards, community_cards)
