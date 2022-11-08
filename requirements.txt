@@ -1,5 +1,5 @@
 pygame # Game Engine
 tqdm # Progress Bars
 treys # to validate that our own implementation of hand evaluation works, but phevaluator is even faster
-joblib
+joblib # parallel computation and store models
 phevaluator # fast poker hand evaluator using string representation of cards

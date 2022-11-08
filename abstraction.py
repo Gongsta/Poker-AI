@@ -23,6 +23,9 @@ import numpy as np
 import os
 import glob
 import joblib
+from joblib import Parallel, delayed
+
+Parallel(n_jobs=-1) # Parllel
 
 """
 BET ABSTRACTION
@@ -83,7 +86,7 @@ def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=
 		start_time = time.time()
 	wins = 0
 	deck = fast_evaluator.Deck(excluded_cards=player_cards + community_cards)
-
+	
 	for _ in range(n):
 		random.shuffle(deck)
 		opponent_cards = deck[:2] # To avoid creating redundant copies
@@ -123,7 +126,7 @@ def calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10
 			
 	return player_wins / n, opponent_wins / n
 
-def calculate_equity_distribution(player_cards: List[str], community_cards=[], bins=5, n=100, timer=True):
+def calculate_equity_distribution(player_cards: List[str], community_cards=[], bins=5, n=200, timer=True, parallel=True):
 	"""
 	n = # of cards to sample from the next round to generate this distribution.
 	
@@ -140,7 +143,6 @@ def calculate_equity_distribution(player_cards: List[str], community_cards=[], b
 	we draw various turn cards, and calculate the equity using those turn cards.  
 	If we find for a given turn card that its equity is 0.645, and we have 10 bins, we would increment the bin 0.60-0.70 by one. 
 	We repeat this process until we get enough turn card samples.
-
 	"""
 	if timer:
 		start_time = time.time()
@@ -150,14 +152,30 @@ def calculate_equity_distribution(player_cards: List[str], community_cards=[], b
 
 	deck = fast_evaluator.Deck(excluded_cards=player_cards + community_cards)
 
-	for i in range(n):
-		random.shuffle(deck)
-		if len(community_cards) == 0:
-			score = calculate_equity(player_cards, community_cards + deck[:3], n=200)
-		else:
-			score = calculate_equity(player_cards, community_cards + deck[:1], n=100)
+	if parallel: # Computing these equity distributions in parallel is much faster
+		def sample_equity():
+			random.shuffle(deck)
+			if len(community_cards) == 0:
+				score = calculate_equity(player_cards, community_cards + deck[:3], n=200)
+			else:
+				score = calculate_equity(player_cards, community_cards + deck[:1], n=100)
 
-		equity_hist[min(int(score * bins), bins-1)] += 1.0 # Score of the closest bucket is incremented by 1
+			# equity_hist[min(int(score * bins), bins-1)] += 1.0 # Score of the closest bucket is incremented by 1
+			return min(int(score * bins), bins-1)
+		
+		equity_bin_list = Parallel(n_jobs=-1)(delayed(sample_equity)() for _ in range(n))
+		for bin_i in equity_bin_list:
+			equity_hist[bin_i] += 1.0
+
+	else:
+		for i in range(n):
+			random.shuffle(deck)
+			if len(community_cards) == 0:
+				score = calculate_equity(player_cards, community_cards + deck[:3], n=200)
+			else:
+				score = calculate_equity(player_cards, community_cards + deck[:1], n=100)
+
+			equity_hist[min(int(score * bins), bins-1)] += 1.0 # Score of the closest bucket is incremented by 1
 	
 	# Normalize the equity so that the probability mass function (p.m.f.) of the distribution sums to 1
 	for i in range(bins):
@@ -333,46 +351,35 @@ def get_filenames(folder, extension='.npy'):
 
 
 if __name__ == "__main__":
-	# stage = 'turn'
-	# generate = False
-	# clustering = False
-	# if generate:
-	# 	generate_postflop_equity_distributions(stage=stage)
+	stage = 'turn'
+	generate = False
+	clustering = False
+	if generate:
+		generate_postflop_equity_distributions(stage=stage)
 	
-	# if clustering:
-	# 	raw_dataset_filenames = get_filenames(f'data/raw/{stage}')
-	# 	filename = raw_dataset_filenames.sort()[-1] # Take the most recently generated dataset to run our clustering on
+	if clustering:
+		raw_dataset_filenames = get_filenames(f'data/raw/{stage}')
+		filename = raw_dataset_filenames.sort()[-1] # Take the most recently generated dataset to run our clustering on
 		
-	# 	equity_distributions = np.load(f'data/raw/{stage}/{filename}')
-	# 	if not os.path.exists(f'data/clusters/{stage}/{filename}'):
-	# 		print(f"Generating the cluster for the {stage}")
-	# 		centroids = cluster_equity_distributions_with_kmeans(equity_distributions)
-	# 		with open(f'data/raw/{stage}/{filename}', 'wb') as f:
-	# 			np.save(f, centroids)
-	# 	else:
-	# 		centroids = joblib.load(f'data/clusters/{stage}/{filename}')
+		equity_distributions = np.load(f'data/raw/{stage}/{filename}')
+		if not os.path.exists(f'data/clusters/{stage}/{filename}'):
+			print(f"Generating the cluster for the {stage}")
+			centroids = cluster_equity_distributions_with_kmeans(equity_distributions)
+			with open(f'data/raw/{stage}/{filename}', 'wb') as f:
+				np.save(f, centroids)
+		else:
+			centroids = joblib.load(f'data/clusters/{stage}/{filename}')
 		
 
 
 		# Visualization
-		# for i in range(equity_distributions.shape[0]):
-		# 	plot_equity_hist(equity_distributions[i])
+		for i in range(equity_distributions.shape[0]):
+			plot_equity_hist(equity_distributions[i])
 
 		# Clustering
 		
 
 		
-	# opponent_cards = []
+	opponent_cards = []
 	
-	deck = fast_evaluator.Deck()
-
-
-	random.shuffle(deck)
-	player_cards = deck[:2]
-	# player_cards = ['Kc', 'Qc']
-	community_cards = deck[2:5]
-	# community_cards = []
-	for _ in range(5000):
-		equity_hist = calculate_equity_distribution(player_cards, community_cards)
-		plot_equity_hist(equity_hist, player_cards, community_cards)
 	

@@ -13,7 +13,7 @@ Poker is a a family comparing card games in which players wager over which hand 
 The version of Poker I am going to be using is **No Limit Texas Hold’Em** (NLTHE), this is by far the most popular one used in all the major tournaments. You can familiarize yourself with the rules [here](https://www.pokernews.com/poker-rules/texas-holdem.htm).
 
 Some Specifications
-- Betting rounds happen during each stage At any point, a player can **fold** out of the current round. If only 1 player remains, they win automatically.
+- Betting rounds happen during each stage. At any point, a player can **fold** out of the current round. If only 1 player remains, they win automatically.
 - Then we show 3 community cards, which is known as the **flop**. Followed by a betting round
 - Stage 0-1: Start a new round.
 - Stage 2: Pre-flop.
@@ -67,11 +67,12 @@ How to evaluate the performance of the Poker AI? There are 3 main ways to measur
 - [x] Implement Deep CFR for Kuhn Poker
 
 ##### 3. Implement the AI for No Limit Texas Hold-Em
-- [ ] Implement testing for lossless abstraction, generate a table for pre-flop using Monte-Carlo technique, same card representation should have exactly the same EHS
+- [ ] Implement abstraction, generate a table for pre-flop using Monte-Carlo technique, same card representation should have exactly the same EHS
 - [ ] Calculate pot odds at different stages of the game (use this as a helper when people actually play the game)
 - [ ] Implement card abstraction to reduce the game size from $10^{161}$ to $10^{12}$ decision points 
 	- [ ] Implement basic monte-carlo method to calculate the EHS of a pair of cards at different stages of the game. This assumes a random uniform draw of opponent hands and random uniform rollout of public cards
 	- [ ] Implement a simple clustering algorithm that uses these EHS to cluster various cards / scenarios together...?
+	- [ x ] Implement parallel methods with `joblib` to accelerate speed: Went from ~0.17s per hand to ~0.05s per hand
 	- Use 169, 5000, 5000, 5000 buckets as outlined here: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
 - [ ] Implement Monte-Carlo CFR
 - [ ] Implement a distributed version of Monte-Carlo CFR

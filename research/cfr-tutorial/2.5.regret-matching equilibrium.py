@@ -9,6 +9,8 @@ strategy = np.zeros(NUM_ACTIONS)
 strategySum = np.zeros(NUM_ACTIONS)
 oppStrategySum = np.zeros(NUM_ACTIONS)
 oppStrategy = np.array([1, 0, 0])
+strategy_hist = []
+oppStrategy_hist = []
 
 def getStrategy():
 	normalizingSum = 0
