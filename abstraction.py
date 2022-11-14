@@ -17,7 +17,6 @@ import fast_evaluator
 from phevaluator import evaluate_cards
 import random
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 import time
 import numpy as np
 import os
@@ -80,6 +79,58 @@ We can cluster hands using K-Means++ to cluster hands of similar distance.
 
 See this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
 """
+class KMeans():
+	"""
+	
+	"""
+def KMeans_cosine(x, K=10, Niter=10, verbose=True):
+    """
+	I need to write my own KMeans algorithm so I can use a custom metric, notably Earth Mover's Distance (EMD). 
+	
+	Implements Lloyd's algorithm for the Cosine similarity metric."""
+
+    start = time.time()
+    N, D = x.shape  # Number of samples, dimension of the ambient space
+
+    c = x[:K, :].clone()  # Simplistic initialization for the centroids
+    # Normalize the centroids for the cosine similarity:
+    c = torch.nn.functional.normalize(c, dim=1, p=2)
+
+    x_i = LazyTensor(x.view(N, 1, D))  # (N, 1, D) samples
+    c_j = LazyTensor(c.view(1, K, D))  # (1, K, D) centroids
+
+    # K-means loop:
+    # - x  is the (N, D) point cloud,
+    # - cl is the (N,) vector of class labels
+    # - c  is the (K, D) cloud of cluster centroids
+    for i in range(Niter):
+
+        # E step: assign points to the closest cluster -------------------------
+        S_ij = x_i | c_j  # (N, K) symbolic Gram matrix of dot products
+        cl = S_ij.argmax(dim=1).long().view(-1)  # Points -> Nearest cluster
+
+        # M step: update the centroids to the normalized cluster average: ------
+        # Compute the sum of points per cluster:
+        c.zero_()
+        c.scatter_add_(0, cl[:, None].repeat(1, D), x)
+
+        # Normalize the centroids, in place:
+        c[:] = torch.nn.functional.normalize(c, dim=1, p=2)
+
+    if verbose:  # Fancy display -----------------------------------------------
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        end = time.time()
+        print(
+            f"K-means for the cosine similarity with {N:,} points in dimension {D:,}, K = {K:,}:"
+        )
+        print(
+            "Timing for {} iterations: {:.5f}s = {} x {:.5f}s\n".format(
+                Niter, end - start, Niter, (end - start) / Niter
+            )
+        )
+
+    return cl, c
 
 def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=False):
 	if timer:
@@ -351,6 +402,8 @@ def get_filenames(folder, extension='.npy'):
 
 
 if __name__ == "__main__":
+	
+# if __name__ == "__main__":
 	stage = 'turn'
 	generate = False
 	clustering = False
