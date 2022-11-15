@@ -1,0 +1,16 @@
+services:
+  main: 
+    build:
+      context: .
+    ports:
+      - "8887:8888"
+    ipc: host
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./:/Poker-AI
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
