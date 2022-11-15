@@ -23,8 +23,9 @@ import os
 import glob
 import joblib
 from joblib import Parallel, delayed
+import torch # To run K-means with GPU
 
-Parallel(n_jobs=-1) # Parllel
+Parallel(n_jobs=-1) # Parallel
 
 """
 BET ABSTRACTION
@@ -79,58 +80,212 @@ We can cluster hands using K-Means++ to cluster hands of similar distance.
 
 See this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
 """
-class KMeans():
+from functools import partial
+import numpy as np
+import torch, geomloss
+from tqdm import tqdm
+
+
+# Modified version of K-Means to add Earth Mover's Distance from here: https://github.com/subhadarship/kmeans_pytorch/blob/master/kmeans_pytorch/__init__.py
+def initialize(X, n_clusters, seed):
 	"""
+	initialize cluster centers
+	:param X: (torch.tensor) matrix
+	:param n_clusters: (int) number of clusters
+	:param seed: (int) seed for kmeans
+	:return: (np.array) initial state
+	"""
+	num_samples = len(X)
+	if seed == None:
+		indices = np.random.choice(num_samples, n_clusters, replace=False)
+	else:
+		np.random.seed(seed) ; indices = np.random.choice(num_samples, n_clusters, replace=False)
+	initial_state = X[indices]
+	return initial_state
+
+def kmeans(
+		X,
+		n_clusters,
+		distance='euclidean',
+		centroids=[],
+		tol=1e-4,
+		tqdm_flag=True,
+		iter_limit=0,
+		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+		seed=None,
+):
+	"""
+	perform kmeans
+	Return
+		X_cluster_ids (torch.tensor), centroids (torch.tensor)
+	"""
+	if tqdm_flag:
+		print(f'running k-means on {device}..')
+
+	if distance == 'euclidean':
+		pairwise_distance_function = partial(pairwise_distance, device=device, tqdm_flag=tqdm_flag)
+	elif distance == 'cosine':
+		pairwise_distance_function = partial(pairwise_cosine, device=device)
+	elif distance == 'EMD':
+		pairwise_distance_function = partial(pairwise_EMD, device=device)
+
+	else:
+		raise NotImplementedError
+
+	if type(X) != torch.Tensor:
+		X = torch.tensor(X)
+	# convert to float
+	X = X.float()
+
+	# transfer to device
+	X = X.to(device)
+
+	# initialize
+	if type(centroids) == list:  # ToDo: make this less annoyingly weird
+		initial_state = initialize(X, n_clusters, seed=seed)
+	else:
+		if tqdm_flag:
+			print('resuming')
+		# find data point closest to the initial cluster center
+		initial_state = centroids
+		dis = pairwise_distance_function(X, initial_state)
+		choice_points = torch.argmin(dis, dim=0)
+		initial_state = X[choice_points]
+		initial_state = initial_state.to(device)
+
+	iteration = 0
+	if tqdm_flag:
+		tqdm_meter = tqdm(desc='[running kmeans]')
+
+	while True:
+		dis = pairwise_distance_function(X, initial_state)
+
+		choice_cluster = torch.argmin(dis, dim=1)
+
+		initial_state_pre = initial_state.clone()
+
+		for index in range(n_clusters):
+			selected = torch.nonzero(choice_cluster == index).squeeze().to(device)
+
+			selected = torch.index_select(X, 0, selected)
+
+			# https://github.com/subhadarship/kmeans_pytorch/issues/16
+			if selected.shape[0] == 0:
+				selected = X[torch.randint(len(X), (1,))]
+
+			initial_state[index] = selected.mean(dim=0)
+
+		center_shift = torch.sum(
+			torch.sqrt(
+				torch.sum((initial_state - initial_state_pre) ** 2, dim=1)
+			))
+
+		# increment iteration
+		iteration = iteration + 1
+
+		# update tqdm meter
+		if tqdm_flag:
+			tqdm_meter.set_postfix(
+				iteration=f'{iteration}',
+				center_shift=f'{center_shift ** 2:0.6f}',
+				tol=f'{tol:0.6f}'
+			)
+			tqdm_meter.update()
+		if center_shift ** 2 < tol:
+			break
+		if iter_limit != 0 and iteration >= iter_limit:
+			break
+
+	return choice_cluster.cpu(), initial_state.cpu() # clusters_indices_on_initial data, final_centroids
+
+
+
+def kmeans_predict(
+		X,
+		centroids,
+		distance='euclidean',
+		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+		tqdm_flag=True
+):
+	"""
+	Return
+		cluster_ids_on_X (torch.tensor)
 	
 	"""
-def KMeans_cosine(x, K=10, Niter=10, verbose=True):
-    """
-	I need to write my own KMeans algorithm so I can use a custom metric, notably Earth Mover's Distance (EMD). 
+	if tqdm_flag:
+		print(f'predicting on {device}..')
+
+	if distance == 'euclidean':
+		pairwise_distance_function = partial(pairwise_distance, device=device, tqdm_flag=tqdm_flag)
+	elif distance == 'cosine':
+		pairwise_distance_function = partial(pairwise_cosine, device=device)
+	elif distance == 'EMD':
+		pairwise_distance_function = partial(pairwise_EMD, device=device)
+	else:
+		raise NotImplementedError
+
+	# convert to float
+	X = X.float()
+
+	# transfer to device
+	X = X.to(device)
+
+	dis = pairwise_distance_function(X, centroids)
+	if (len(dis.shape) == 1): # Prediction on a single data
+		choice_cluster = torch.argmin(dis)
+		
+	else: 
+		choice_cluster = torch.argmin(dis, dim=1)
+
+	return choice_cluster.cpu()
+
+
+def pairwise_distance(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'), tqdm_flag=True):
+	if tqdm_flag:
+		print(f'device is :{device}')
 	
-	Implements Lloyd's algorithm for the Cosine similarity metric."""
+	# transfer to device
+	data1, data2 = data1.to(device), data2.to(device)
 
-    start = time.time()
-    N, D = x.shape  # Number of samples, dimension of the ambient space
+	A = data1.unsqueeze(dim=1) # N*1*M
+	B = data2.unsqueeze(dim=0) # 1*N*M
 
-    c = x[:K, :].clone()  # Simplistic initialization for the centroids
-    # Normalize the centroids for the cosine similarity:
-    c = torch.nn.functional.normalize(c, dim=1, p=2)
+	dis = (A - B) ** 2.0
+	# return N*N matrix for pairwise distance
+	dis = dis.sum(dim=-1).squeeze()
+	return dis
 
-    x_i = LazyTensor(x.view(N, 1, D))  # (N, 1, D) samples
-    c_j = LazyTensor(c.view(1, K, D))  # (1, K, D) centroids
 
-    # K-means loop:
-    # - x  is the (N, D) point cloud,
-    # - cl is the (N,) vector of class labels
-    # - c  is the (K, D) cloud of cluster centroids
-    for i in range(Niter):
+def pairwise_cosine(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
+	# transfer to device
+	data1, data2 = data1.to(device), data2.to(device)
 
-        # E step: assign points to the closest cluster -------------------------
-        S_ij = x_i | c_j  # (N, K) symbolic Gram matrix of dot products
-        cl = S_ij.argmax(dim=1).long().view(-1)  # Points -> Nearest cluster
+	A = data1.unsqueeze(dim=1) # N*1*M
+	B = data2.unsqueeze(dim=0) # 1*N*M
 
-        # M step: update the centroids to the normalized cluster average: ------
-        # Compute the sum of points per cluster:
-        c.zero_()
-        c.scatter_add_(0, cl[:, None].repeat(1, D), x)
+	# normalize the points  | [0.3, 0.4] -> [0.3/sqrt(0.09 + 0.16), 0.4/sqrt(0.09 + 0.16)] = [0.3/0.5, 0.4/0.5]
+	A_normalized = A / A.norm(dim=-1, keepdim=True)
+	B_normalized = B / B.norm(dim=-1, keepdim=True)
 
-        # Normalize the centroids, in place:
-        c[:] = torch.nn.functional.normalize(c, dim=1, p=2)
+	cosine = A_normalized * B_normalized
 
-    if verbose:  # Fancy display -----------------------------------------------
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        end = time.time()
-        print(
-            f"K-means for the cosine similarity with {N:,} points in dimension {D:,}, K = {K:,}:"
-        )
-        print(
-            "Timing for {} iterations: {:.5f}s = {} x {:.5f}s\n".format(
-                Niter, end - start, Niter, (end - start) / Niter
-            )
-        )
+	# return N*N matrix for pairwise distance
+	cosine_dis = 1 - cosine.sum(dim=-1).squeeze()
+	return cosine_dis
 
-    return cl, c
+
+def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
+	# transfer to device
+	data1, data2 = data1.to(device), data2.to(device)
+
+	print(data1.shape, data2.shape)
+
+	batch = data2.shape[0]
+	dist = geomloss.SamplesLoss('sinkhorn')
+	distances = [dist(torch.stack(batch*[data1[i]]).unsqueeze(1), data2.unsqueeze(1)) for i in range(data1.shape[0])]
+	dis = torch.stack(distances)
+	return dis
+	
 
 def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=False):
 	if timer:
@@ -177,8 +332,11 @@ def calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10
 			
 	return player_wins / n, opponent_wins / n
 
-def calculate_equity_distribution(player_cards: List[str], community_cards=[], bins=5, n=200, timer=True, parallel=True):
+def calculate_equity_distribution(player_cards: List[str], community_cards=[], bins=5, n=200, timer=False, parallel=True):
 	"""
+	Return
+		equity_hist - Histogram as a list of "bins" elements
+
 	n = # of cards to sample from the next round to generate this distribution.
 	
 	There is a tradeoff between the execution speed and variance of the values calculated, since
@@ -298,7 +456,7 @@ def create_abstraction_folders():
 				os.makedirs(f'data/{split}/{stage}')
 
 
-def generate_postflop_equity_distributions(n=1000, bins=5, save=True, stage=None, timer=True): # Lossful abstraction for flop, turn and river
+def generate_postflop_equity_distributions(n_samples=10000, bins=5, save=True, stage=None, timer=True): # Lossful abstraction for flop, turn and river
 	if timer:
 		start_time = time.time()
 	assert(stage is None or stage == 'flop' or stage == 'turn' or stage == 'river')
@@ -307,9 +465,9 @@ def generate_postflop_equity_distributions(n=1000, bins=5, save=True, stage=None
 	
 	
 	if stage is None:
-		generate_postflop_equity_distributions(n, save, stage='flop')
-		# generate_postflop_clusters(n_clusters, save, stage='turn')
-		# generate_postflop_clusters(n_clusters, save, stage='river')
+		generate_postflop_equity_distributions(n_samples, save, stage='flop')
+		# generate_postflop_clusters(n, save, stage='turn')
+		# generate_postflop_clusters(n, save, stage='river')
 	elif stage == 'flop':
 		num_community_cards = 3
 	elif stage == 'turn':
@@ -318,7 +476,7 @@ def generate_postflop_equity_distributions(n=1000, bins=5, save=True, stage=None
 		num_community_cards = 5
 	
 	deck = fast_evaluator.Deck()
-	for i in range(n):
+	for i in tqdm(range(n_samples)):
 		random.shuffle(deck)
 		
 		player_cards = deck[:2]
@@ -327,7 +485,6 @@ def generate_postflop_equity_distributions(n=1000, bins=5, save=True, stage=None
 		equity_distributions.append(distribution)
 		hands.append(' '.join(player_cards + community_cards))
 		
-		print("iteration: ", i)
 	
 	assert(len(equity_distributions) == len(hands))
 
@@ -340,9 +497,9 @@ def generate_postflop_equity_distributions(n=1000, bins=5, save=True, stage=None
 		joblib.dump(hands, f'data/raw/{stage}/{file_id}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
 	
 	
-def cluster_equity_distributions_with_kmeans(n_clusters=100, data=None):
-	kmeans = KMeans(n_clusters=n_clusters).fit(data)
-	return kmeans.cluster_centers_
+def cluster_equity_distributions_with_kmeans(data, n_clusters=100):
+	data_cluster_ids, centroids = kmeans(data, n_clusters)
+	return data_cluster_ids, centroids
 
 
 
@@ -350,44 +507,44 @@ def visualize_clustering():
 	# TODO: Visualize the clustering by actually seeing how the distributions shown
 	return
 
-def approximate_EMD(xn, m, sorted_distances, ordered_clusters):
-	"""Algorithm for efficiently approximating EMD, from 10.1609/aaai.v28i1.8816. Don't know if I am actually going to use this.
+# def approximate_EMD(xn, m, sorted_distances, ordered_clusters):
+# 	"""Algorithm for efficiently approximating EMD, from 10.1609/aaai.v28i1.8816. Don't know if I am actually going to use this.
 	
-	Input
-	xn: Point xn with N elements
-	m: mean with Q elements
-	sorted_distances:
-	or
+# 	Input
+# 	xn: Point xn with N elements
+# 	m: mean with Q elements
+# 	sorted_distances:
+# 	or
 	
-	Output: the approximate EMD
-	"""
-	N = len(xn)
-	Q = len(m)
-	targets = [1/len(xn) for _ in range(N)]
-	mean_remaining = deepcopy.copy(m)
-	done = [False for _ in range(N)]
-	total_cost = 0
-	for i in range(Q):
-		for j in range(N):
-			if done[j]:
-				continue
-			point_cluster = xn[j]
-			mean_cluster = ordered_clusters[point_cluster][i]
-			amount_remaining = mean_remaining[mean_cluster]
-			if amount_remaining == 0:
-				continue
+# 	Output: the approximate EMD
+# 	"""
+# 	N = len(xn)
+# 	Q = len(m)
+# 	targets = [1/len(xn) for _ in range(N)]
+# 	mean_remaining = deepcopy.copy(m)
+# 	done = [False for _ in range(N)]
+# 	total_cost = 0
+# 	for i in range(Q):
+# 		for j in range(N):
+# 			if done[j]:
+# 				continue
+# 			point_cluster = xn[j]
+# 			mean_cluster = ordered_clusters[point_cluster][i]
+# 			amount_remaining = mean_remaining[mean_cluster]
+# 			if amount_remaining == 0:
+# 				continue
 			
-			d = sorted_distances[point_cluster][i]
-			if amount_remaining < targets[j]:
-				total_cost += amount_remaining * d
-				targets[j] -= amount_remaining
-				mean_remaining[mean_cluster] = 0
-			else:
-				total_cost += targets[j] * d
-				targets[j] = 0
-				mean_remaining[mean_cluster] -= targets[j]
-				done[j] = True
-	return total_cost
+# 			d = sorted_distances[point_cluster][i]
+# 			if amount_remaining < targets[j]:
+# 				total_cost += amount_remaining * d
+# 				targets[j] -= amount_remaining
+# 				mean_remaining[mean_cluster] = 0
+# 			else:
+# 				total_cost += targets[j] * d
+# 				targets[j] = 0
+# 				mean_remaining[mean_cluster] -= targets[j]
+# 				done[j] = True
+# 	return total_cost
 		
 
 def get_filenames(folder, extension='.npy'):
@@ -401,38 +558,44 @@ def get_filenames(folder, extension='.npy'):
 	return filenames
 
 
-if __name__ == "__main__":
 	
-# if __name__ == "__main__":
+if __name__ == "__main__":
 	stage = 'turn'
-	generate = False
-	clustering = False
+	generate = True # Generate histogram distributions to cluster on
+	clustering = False # Cluster these histogram distributions
 	if generate:
 		generate_postflop_equity_distributions(stage=stage)
 	
 	if clustering:
 		raw_dataset_filenames = get_filenames(f'data/raw/{stage}')
-		filename = raw_dataset_filenames.sort()[-1] # Take the most recently generated dataset to run our clustering on
+		sorted(raw_dataset_filenames)
+		filename = raw_dataset_filenames[-1] # Take the most recently generated dataset to run our clustering on
 		
 		equity_distributions = np.load(f'data/raw/{stage}/{filename}')
 		if not os.path.exists(f'data/clusters/{stage}/{filename}'):
 			print(f"Generating the cluster for the {stage}")
-			centroids = cluster_equity_distributions_with_kmeans(equity_distributions)
-			with open(f'data/raw/{stage}/{filename}', 'wb') as f:
-				np.save(f, centroids)
-		else:
+			cluster_indices, centroids = cluster_equity_distributions_with_kmeans(equity_distributions) # Perform Clustering
+			joblib.dump(centroids, f'data/clusters/{stage}/{filename}')
+		else: # Centroids have already been generated, just load them
 			centroids = joblib.load(f'data/clusters/{stage}/{filename}')
 		
+		
+		print(centroids)
+
+		# # Visualization of the hands
+		# hands = joblib.load(f'data/raw/{stage}/{filename.split(".")[0]}')  
+		# for i in range(equity_distributions.shape[0]):
+		# 	hand = hands[i]
+		# 	hand = hand.split(' ')
+		# 	player_cards = hand[0]
+		# 	community_cards = hand[0]
+		# 	plot_equity_hist(equity_distributions[i], player_cards, community_cards)
+		
+		# Visualize the clusstering
 
 
-		# Visualization
-		for i in range(equity_distributions.shape[0]):
-			plot_equity_hist(equity_distributions[i])
-
-		# Clustering
 		
 
 		
-	opponent_cards = []
 	
 	

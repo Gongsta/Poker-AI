@@ -7,6 +7,10 @@ I have been incrementally developing the Poker bot, starting with Kuhn Poker whi
 
 I might need to write C++ code, since training on the Python code might take a very long time.
 
+### Installation
+This repository requires Python>=3.9.
+
+
 ### Basic Explanations of the Game + Class Definitions
 Poker is a a family comparing card games in which players wager over which hand is best according to that specific game's rules in ways similar to these rankings. The goal of the game is to win as much money as possible. Unlike other games like Blackjack where players work together and try to beat the "house" (i.e. the casino), Poker is a game in which players try to beat each other.
 
