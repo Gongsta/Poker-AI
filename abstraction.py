@@ -25,8 +25,6 @@ import joblib
 from joblib import Parallel, delayed
 import torch # To run K-means with GPU
 
-Parallel(n_jobs=-1) # Parallel
-
 """
 BET ABSTRACTION
 """
@@ -115,7 +113,17 @@ def kmeans(
 		seed=None,
 ):
 	"""
-	perform kmeans
+	perform kmeans n_init, default=10
+	Number of time the k-means algorithm will be run with different centroid seeds. The final results will be the best output of n_init consecutive runs in terms of inertia.
+	:param X: (torch.tensor) matrix
+    :param num_clusters: (int) number of clusters
+    :param distance: (str) distance [options: 'euclidean', 'cosine'] [default: 'euclidean']
+    :param seed: (int) seed for kmeans
+    :param tol: (float) threshold [default: 0.0001]
+    :param device: (torch.device) device [default: cpu]
+    :param tqdm_flag: Allows to turn logs on and off
+    :param iter_limit: hard limit for max number of iterations
+    :param gamma_for_soft_dtw: approaches to (hard) DTW as gamma -> 0
 	Return
 		X_cluster_ids (torch.tensor), centroids (torch.tensor)
 	"""
@@ -366,8 +374,10 @@ def calculate_equity_distribution(player_cards: List[str], community_cards=[], b
 			random.shuffle(deck)
 			if len(community_cards) == 0:
 				score = calculate_equity(player_cards, community_cards + deck[:3], n=200)
-			else:
+			elif (len(community_cards) < 5):
 				score = calculate_equity(player_cards, community_cards + deck[:1], n=100)
+			else:
+				score = calculate_equity(player_cards, community_cards, n=100)
 
 			# equity_hist[min(int(score * bins), bins-1)] += 1.0 # Score of the closest bucket is incremented by 1
 			return min(int(score * bins), bins-1)
@@ -456,7 +466,7 @@ def create_abstraction_folders():
 				os.makedirs(f'data/{split}/{stage}')
 
 
-def generate_postflop_equity_distributions(n_samples=10000, bins=5, save=True, stage=None, timer=True): # Lossful abstraction for flop, turn and river
+def generate_postflop_equity_distributions(n_samples=200, bins=5, save=True, stage=None, timer=True): # Lossful abstraction for flop, turn and river
 	if timer:
 		start_time = time.time()
 	assert(stage is None or stage == 'flop' or stage == 'turn' or stage == 'river')
@@ -466,8 +476,8 @@ def generate_postflop_equity_distributions(n_samples=10000, bins=5, save=True, s
 	
 	if stage is None:
 		generate_postflop_equity_distributions(n_samples, save, stage='flop')
-		# generate_postflop_clusters(n, save, stage='turn')
-		# generate_postflop_clusters(n, save, stage='river')
+		generate_postflop_equity_distributions(n_samples, save, stage='turn')
+		generate_postflop_equity_distributions(n_samples, save, stage='river')
 	elif stage == 'flop':
 		num_community_cards = 3
 	elif stage == 'turn':
@@ -489,6 +499,7 @@ def generate_postflop_equity_distributions(n_samples=10000, bins=5, save=True, s
 	assert(len(equity_distributions) == len(hands))
 
 	equity_distributions = np.array(equity_distributions)
+	print(equity_distributions)
 	if save:
 		create_abstraction_folders()
 		file_id = int(time.time()) # Use the time as the file_id
@@ -497,13 +508,17 @@ def generate_postflop_equity_distributions(n_samples=10000, bins=5, save=True, s
 		joblib.dump(hands, f'data/raw/{stage}/{file_id}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
 	
 	
-def cluster_equity_distributions_with_kmeans(data, n_clusters=100):
+def cluster_equity_distributions_with_kmeans(data, n_clusters=10):
 	data_cluster_ids, centroids = kmeans(data, n_clusters)
 	return data_cluster_ids, centroids
 
 
 
 def visualize_clustering():
+	"""Visualization higher dimensional data is super interesting.
+	
+	"""
+
 	# TODO: Visualize the clustering by actually seeing how the distributions shown
 	return
 
@@ -561,8 +576,8 @@ def get_filenames(folder, extension='.npy'):
 	
 if __name__ == "__main__":
 	stage = 'turn'
-	generate = True # Generate histogram distributions to cluster on
-	clustering = False # Cluster these histogram distributions
+	generate = False # Generate histogram distributions to cluster on
+	clustering = True # Cluster these histogram distributions
 	if generate:
 		generate_postflop_equity_distributions(stage=stage)
 	

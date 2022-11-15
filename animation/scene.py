@@ -12,8 +12,6 @@ Lif of animations I need to make:
 
 """
 
-
-
 # config.background_color = PURE_GREEN
 
 class NashEquilibriumText(Scene):
@@ -60,3 +58,8 @@ class CFRText(Scene):
         self.play(Write(text2))
         self.wait(2)
         self.play(FadeOut(*self.mobjects))
+
+
+class GraphExample(Scene):
+    def construct(self):
+        ax = Axes(x_range=[0,5,1], y_range=[0,3,1])
