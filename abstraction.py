@@ -86,7 +86,7 @@ How do I find the optimal number of clusters?
 """
 from functools import partial
 import numpy as np
-import torch, geomloss
+import torch
 from tqdm import tqdm
 
 
