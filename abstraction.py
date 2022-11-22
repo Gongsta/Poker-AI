@@ -298,6 +298,7 @@ def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_avail
 	pos_a = torch.tensor([[i] for i in range(n)])
 	pos_b = torch.tensor([[i] for i in range(n)])
 	C = ot.dist(pos_a, pos_b, metric='euclidean')
+	C.to(device)
 
 	dist = torch.zeros((data1.shape[0], data2.shape[0]))
 	for i, hist_a in enumerate(data1):

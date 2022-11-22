@@ -6,3 +6,4 @@ phevaluator # fast poker hand evaluator using string representation of cards
 geomloss
 torch
 matplotlib
+pot
