@@ -605,7 +605,7 @@ if __name__ == "__main__":
 	clustering = True # Cluster these histogram distributions
 
 	stage = args.stage
-	n_samples = args.n_samples
+	n_samples = int(args.n_samples)
 	bins = args.bins
 
 	if generate:
