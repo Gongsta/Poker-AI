@@ -24,6 +24,7 @@ import glob
 import joblib
 from joblib import Parallel, delayed
 import torch # To run K-means with GPU
+import ot
 
 """
 BET ABSTRACTION
@@ -71,12 +72,17 @@ We the equity of a given hand / paired with a board, the EHS of a pair of cards
 at different stages of the game, which is calculated assuming a random uniform draw of opponent hands and random uniform rollout of public cards.
 
 It uses a simple Monte-Carlo method, which samples lots of hands. Over lots of iterations, it will converge 
-to the expected hand strength.
+to the expected hand strength. To have a descriptive description of the potential of a hand, I use
+an equity distribution rather than a scalar value. This idea was taken from this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
 
-We can cluster hands using K-Means++ to cluster hands of similar distance.
+This kind of abstraction is used by all superhuman Poker AIs.
+
+We can cluster hands using K-Means to cluster hands of similar distance. The distance metric used is Earth Mover's 
+Distance, which is taken from the Python Optiaml Transport Library.
+
+How do I find the optimal number of clusters?
 
 
-See this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
 """
 from functools import partial
 import numpy as np
@@ -104,9 +110,9 @@ def initialize(X, n_clusters, seed):
 def kmeans(
 		X,
 		n_clusters,
-		distance='euclidean',
+		distance='EMD',
 		centroids=[],
-		tol=1e-4,
+		tol=1e-3,
 		tqdm_flag=True,
 		iter_limit=0,
 		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
@@ -119,7 +125,7 @@ def kmeans(
     :param num_clusters: (int) number of clusters
     :param distance: (str) distance [options: 'euclidean', 'cosine'] [default: 'euclidean']
     :param seed: (int) seed for kmeans
-    :param tol: (float) threshold [default: 0.0001]
+    :param tol: (float) threshold [default: 0.001]
     :param device: (torch.device) device [default: cpu]
     :param tqdm_flag: Allows to turn logs on and off
     :param iter_limit: hard limit for max number of iterations
@@ -211,7 +217,7 @@ def kmeans(
 def kmeans_predict(
 		X,
 		centroids,
-		distance='euclidean',
+		distance='EMD',
 		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
 		tqdm_flag=True
 ):
@@ -233,6 +239,8 @@ def kmeans_predict(
 		raise NotImplementedError
 
 	# convert to float
+	if type(X) != torch.Tensor:
+		X = torch.tensor(X)
 	X = X.float()
 
 	# transfer to device
@@ -283,17 +291,50 @@ def pairwise_cosine(data1, data2, device=torch.device('cuda' if torch.cuda.is_av
 
 
 def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
-	# transfer to device
-	data1, data2 = data1.to(device), data2.to(device)
+	assert(len(data1.shape) == 2)
+	assert(len(data2.shape) == 2)
+	assert(data1.shape[1] == data2.shape[1])
+	n = data1.shape[1]
+	pos_a = torch.tensor([[i] for i in range(n)])
+	pos_b = torch.tensor([[i] for i in range(n)])
+	C = ot.dist(pos_a, pos_b, metric='euclidean')
 
-	print(data1.shape, data2.shape)
-
-	batch = data2.shape[0]
-	dist = geomloss.SamplesLoss('sinkhorn')
-	distances = [dist(torch.stack(batch*[data1[i]]).unsqueeze(1), data2.unsqueeze(1)) for i in range(data1.shape[0])]
-	dis = torch.stack(distances)
-	return dis
+	dist = torch.zeros((data1.shape[0], data2.shape[0]))
+	for i, hist_a in enumerate(data1):
+		for j, hist_b in enumerate(data2):
+			ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max") # NOTE: I overwrite the original python package to reduce the level of precision required to 5
+			transport_cost_matrix = ot_emd * C
+			dist[i][j] = transport_cost_matrix.sum()
 	
+	return dist
+
+def kmeans_search(X):
+	"""
+	We can check for the quality of clustering by checking the inter-cluster distance, using the 
+	same metric that we used for EMD.
+	
+	At some point, there is no point in increasing the number of clusters, since we don't really
+	get more information.
+	"""
+	# Search for the optimal number of clusters through a grid like search
+
+	n_clusters = [10, 25, 50, 100, 200]
+	for n_cluster in n_clusters:
+		cluster_indices, centroids = kmeans(X, n_cluster)
+		distances = pairwise_EMD(centroids, centroids) 
+		print("inter cluster distances")
+		print(distances)
+		print(distances.max(), distances.min())
+
+
+	
+
+
+
+
+
+
+
 
 def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=False):
 	if timer:
@@ -466,7 +507,7 @@ def create_abstraction_folders():
 				os.makedirs(f'data/{split}/{stage}')
 
 
-def generate_postflop_equity_distributions(n_samples=200, bins=5, save=True, stage=None, timer=True): # Lossful abstraction for flop, turn and river
+def generate_postflop_equity_distributions(n_samples, bins,stage=None, save=True, timer=True): # Lossful abstraction for flop, turn and river
 	if timer:
 		start_time = time.time()
 	assert(stage is None or stage == 'flop' or stage == 'turn' or stage == 'river')
@@ -475,9 +516,9 @@ def generate_postflop_equity_distributions(n_samples=200, bins=5, save=True, sta
 	
 	
 	if stage is None:
-		generate_postflop_equity_distributions(n_samples, save, stage='flop')
-		generate_postflop_equity_distributions(n_samples, save, stage='turn')
-		generate_postflop_equity_distributions(n_samples, save, stage='river')
+		generate_postflop_equity_distributions(n_samples, bins, 'flop', save, timer)
+		generate_postflop_equity_distributions(n_samples, bins, 'turn', save, timer)
+		generate_postflop_equity_distributions(n_samples, bins, 'river', save, timer)
 	elif stage == 'flop':
 		num_community_cards = 3
 	elif stage == 'turn':
@@ -503,15 +544,11 @@ def generate_postflop_equity_distributions(n_samples=200, bins=5, save=True, sta
 	if save:
 		create_abstraction_folders()
 		file_id = int(time.time()) # Use the time as the file_id
-		with open(f'data/raw/{stage}/{file_id}.npy', 'wb') as f:
+		with open(f'data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy', 'wb') as f:
 			np.save(f, equity_distributions)
-		joblib.dump(hands, f'data/raw/{stage}/{file_id}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
+		joblib.dump(hands, f'data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
 	
 	
-def cluster_equity_distributions_with_kmeans(data, n_clusters=10):
-	data_cluster_ids, centroids = kmeans(data, n_clusters)
-	return data_cluster_ids, centroids
-
 
 
 def visualize_clustering():
@@ -522,44 +559,6 @@ def visualize_clustering():
 	# TODO: Visualize the clustering by actually seeing how the distributions shown
 	return
 
-# def approximate_EMD(xn, m, sorted_distances, ordered_clusters):
-# 	"""Algorithm for efficiently approximating EMD, from 10.1609/aaai.v28i1.8816. Don't know if I am actually going to use this.
-	
-# 	Input
-# 	xn: Point xn with N elements
-# 	m: mean with Q elements
-# 	sorted_distances:
-# 	or
-	
-# 	Output: the approximate EMD
-# 	"""
-# 	N = len(xn)
-# 	Q = len(m)
-# 	targets = [1/len(xn) for _ in range(N)]
-# 	mean_remaining = deepcopy.copy(m)
-# 	done = [False for _ in range(N)]
-# 	total_cost = 0
-# 	for i in range(Q):
-# 		for j in range(N):
-# 			if done[j]:
-# 				continue
-# 			point_cluster = xn[j]
-# 			mean_cluster = ordered_clusters[point_cluster][i]
-# 			amount_remaining = mean_remaining[mean_cluster]
-# 			if amount_remaining == 0:
-# 				continue
-			
-# 			d = sorted_distances[point_cluster][i]
-# 			if amount_remaining < targets[j]:
-# 				total_cost += amount_remaining * d
-# 				targets[j] -= amount_remaining
-# 				mean_remaining[mean_cluster] = 0
-# 			else:
-# 				total_cost += targets[j] * d
-# 				targets[j] = 0
-# 				mean_remaining[mean_cluster] -= targets[j]
-# 				done[j] = True
-# 	return total_cost
 		
 
 def get_filenames(folder, extension='.npy'):
@@ -574,28 +573,59 @@ def get_filenames(folder, extension='.npy'):
 
 
 	
+import argparse
 if __name__ == "__main__":
-	stage = 'turn'
-	generate = False # Generate histogram distributions to cluster on
+	parser = argparse.ArgumentParser(description="Generate Poker Hand Abstractions.")
+	parser.add_argument("-g", "--generate",
+                    action="store_true", dest="generate", default=False,
+                    help="Generate Abstractions.")
+	parser.add_argument("--n_samples", default=10000, 
+                    dest="n_samples",
+                    help="Number of samples to sample from to generate the abstraction.")
+	parser.add_argument("--n_clusters", default=50, 
+                    dest="n_clusters",
+                    help="Number of clusters to generate.")
+	parser.add_argument("-b", "--bins", default=5, 
+                    dest="bins",
+                    help="The granularity of your generated data.")
+	parser.add_argument("-s", "--stage", default='turn', 
+                    dest="stage", 
+                    help="Select the stage of the game that you would like to abstract (flop, turn, river).")
+	# Hyperparamtesrs
+	args = parser.parse_args()
+
+	generate = args.generate # Generate histogram distributions to cluster on
 	clustering = True # Cluster these histogram distributions
+
+	stage = args.stage
+	n_samples = args.n_samples
+	bins = args.bins
+
 	if generate:
-		generate_postflop_equity_distributions(stage=stage)
+		generate_postflop_equity_distributions(n_samples, bins, stage)
 	
 	if clustering:
-		raw_dataset_filenames = get_filenames(f'data/raw/{stage}')
-		sorted(raw_dataset_filenames)
+		raw_dataset_filenames = sorted(get_filenames(f'data/raw/{stage}'))
 		filename = raw_dataset_filenames[-1] # Take the most recently generated dataset to run our clustering on
 		
 		equity_distributions = np.load(f'data/raw/{stage}/{filename}')
+		print(filename)
 		if not os.path.exists(f'data/clusters/{stage}/{filename}'):
 			print(f"Generating the cluster for the {stage}")
-			cluster_indices, centroids = cluster_equity_distributions_with_kmeans(equity_distributions) # Perform Clustering
+			print(filename)
+			cluster_indices, centroids = kmeans(equity_distributions, n_clusters=10) # Perform Clustering
 			joblib.dump(centroids, f'data/clusters/{stage}/{filename}')
-		else: # Centroids have already been generated, just load them
+		else: # Centroids have already been generated, just load them, which are tensors
+			print(equity_distributions)
+			kmeans_search(equity_distributions)
 			centroids = joblib.load(f'data/clusters/{stage}/{filename}')
 		
 		
-		print(centroids)
+		sorted_centroids = centroids[centroids[:, 0].argsort()]
+		# sorted_centroids, indices = torch.argsort(centroids, dim=0)
+		print(sorted_centroids)
+		cluster_indices = kmeans_predict(equity_distributions,  centroids)
+		
 
 		# # Visualization of the hands
 		# hands = joblib.load(f'data/raw/{stage}/{filename.split(".")[0]}')  

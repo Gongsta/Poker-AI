@@ -12,7 +12,10 @@ Lif of animations I need to make:
 
 """
 
-# config.background_color = PURE_GREEN
+# Some options of background colors
+# config.background_color = "#151213" # Dark brown Gray
+# config.background_color = "#262627" # Gray
+# config.background_color = "#121212" # Dark Gray
 
 class NashEquilibriumText(Scene):
     def construct(self):
@@ -26,21 +29,38 @@ class NashEquilibriumText(Scene):
         self.wait(2)
         self.play(FadeOut(*self.mobjects)) # TODO: Maybe link this together with the next animation
 
+
+class bits(Scene):
+    def construct(self):
+        MONOLISA_FONT = 'MonoLisa'
+        cardsText = Text('52 Cards', font=MONOLISA_FONT)
+        bits = Text(r'0000000000000000000000000000000000000000000000000', font=MONOLISA_FONT, font_size=28)
+        self.play(ReplacementTransform(cardsText, bits))
+        bits_with_cards = Text(r'0010001000000000000000000000000000000000000000100', font=MONOLISA_FONT, font_size=28)
+        self.play(ReplacementTransform(bits, bits_with_cards))
+        clubs_02 = ImageMobject('../assets/cards/card_clubs_02.png')
+        self.play(FadeIn(clubs_02))
+        # self.play(ReplacementTransform(bits_with_cards, clubs_02))
+
+
+
 class RPS(Scene):
     def construct(self):
+        rpsText = Tex("Rock Paper Scissors", font_size=100)
+        self.play(Write(rpsText))
         
         startPos = 2*UP
-        blueStart = Circle(0.3, color=BLUE).shift(startPos)
-        player_text = Tex("You", font_size=36).shift(startPos + 1.5*RIGHT)
-        self.play(AnimationGroup(Create(blueStart), Write(player_text), lag_ratio=0.4))
-        blueStart1 = Circle(0.3, color=BLUE).move_to(blueStart.get_center())
-        blueStart2 = Circle(0.3, color=BLUE).move_to(blueStart.get_center())
-        blueStart3 = Circle(0.3, color=BLUE).move_to(blueStart.get_center())
+        blueStart = Circle(0.3, color=RED).shift(startPos)
+        player_text = Tex("Opponent", font_size=36).shift(startPos + 2*RIGHT)
+        self.play(AnimationGroup(Transform(rpsText, blueStart), Write(player_text), lag_ratio=0.6))
+        # This is a "hack" to allow me to create duplicates to transform one node into three nodes
+        blueStart1 = Circle(0.3, color=RED).move_to(blueStart.get_center())
+        blueStart2 = Circle(0.3, color=RED).move_to(blueStart.get_center())
+        blueStart3 = Circle(0.3, color=RED).move_to(blueStart.get_center())
         
-        
-        redRock = Circle(0.3, color=RED).move_to(blueStart.get_center()).shift(3*LEFT + 2 * DOWN)
-        redPaper = Circle(0.3, color=RED).move_to(blueStart.get_center()).shift(2 * DOWN)
-        redScissors = Circle(0.3, color=RED).move_to(blueStart.get_center()).shift(3*RIGHT + 2 * DOWN)
+        redRock = Circle(0.3, color=BLUE).move_to(blueStart.get_center()).shift(3*LEFT + 2 * DOWN)
+        redPaper = Circle(0.3, color=BLUE).move_to(blueStart.get_center()).shift(2 * DOWN)
+        redScissors = Circle(0.3, color=BLUE).move_to(blueStart.get_center()).shift(3*RIGHT + 2 * DOWN)
         
         redRPS = [redRock, redPaper, redScissors]
         
@@ -48,19 +68,30 @@ class RPS(Scene):
         line1 = Line(LEFT, LEFT) # intialize empty line
         line2 = Line(LEFT, LEFT) # intialize empty line
         line3 = Line(LEFT, LEFT) # intialize empty line
-        line1.add_updater(lambda z: z.become(Line(blueStart.point_at_angle(225*DEGREES), blueStart1.point_at_angle(45*DEGREES))) if blueStart.point_at_angle(225*DEGREES)[0] > blueStart1.point_at_angle(45*DEGREES)[0] else None)
+        line1.add_updater(lambda z: z.become(Line(normalize(blueStart1.get_center() -  blueStart.get_center()) * 0.3 + blueStart.get_center(), normalize(-blueStart1.get_center() + blueStart.get_center()) * 0.3 + blueStart1.get_center())) if blueStart.point_at_angle(225*DEGREES)[0] > blueStart1.point_at_angle(45*DEGREES)[0] else None)
         line2.add_updater(lambda z: z.become(Line(blueStart.point_at_angle(270*DEGREES), blueStart2.point_at_angle(90*DEGREES))) if blueStart.point_at_angle(270*DEGREES)[1] > blueStart2.point_at_angle(90*DEGREES)[1] else None)
-        line3.add_updater(lambda z: z.become(Line(blueStart.point_at_angle(315*DEGREES), blueStart3.point_at_angle(135*DEGREES))) if blueStart.point_at_angle(315*DEGREES)[0] < blueStart3.point_at_angle(135*DEGREES)[0] else None)
+        line3.add_updater(lambda z: z.become(Line(normalize(blueStart3.get_center() -  blueStart.get_center()) * 0.3 + blueStart.get_center(), normalize(-blueStart3.get_center() + blueStart.get_center()) * 0.3 + blueStart3.get_center())) if blueStart.point_at_angle(315*DEGREES)[0] < blueStart3.point_at_angle(135*DEGREES)[0] else None)
         self.add(line1, line2, line3)
 
-        opponent_text = Tex("Opponent", font_size=36).move_to(redScissors.get_center()).shift(2*RIGHT)
-        self.play(AnimationGroup(AnimationGroup(Transform(blueStart1, redRPS[0]), Transform(blueStart2, redRPS[1]), Transform(blueStart3, redRPS[2])),
-        Write(opponent_text), lag_ratio=0.5)
-        )
+        # self.play(AnimationGroup(Transform(blueStart1, redRPS[0]), Transform(blueStart2, redRPS[1]), Transform(blueStart3, redRPS[2])))
+        # lag_ratio = 0.5
+
+        opponent_text = Tex("You", font_size=36).move_to(redScissors.get_center()).shift(1.5*RIGHT)
+        rockVec = redRock.get_center() -  blueStart.get_center()
+        scissorsVec = redScissors.get_center() -  blueStart.get_center()
+        rockText = Tex("Rock", font_size=28).rotate(np.arctan(rockVec[1] /rockVec[0])).move_to(line1.point_from_proportion(0.6) + 0.3 *UP)
+        paperText = Tex("Paper", font_size=28).rotate(-PI/2).move_to(line2.point_from_proportion(0.5) + 0.23 *RIGHT)
+        scissorsText = Tex("Scissors", font_size=28).rotate(np.arctan(scissorsVec[1] /scissorsVec[0])).move_to(line3.point_from_proportion(0.6) + 0.3 *UP)
+        rockText.add_updater(lambda z: z.move_to(line1.point_from_proportion(0.6) + 0.3 *UP))
+        paperText.add_updater(lambda z: z.move_to(line2.point_from_proportion(0.5) + 0.23 *RIGHT))
+        scissorsText.add_updater(lambda z: z.move_to(line3.point_from_proportion(0.6) + 0.3 *UP))
+        # self.play(Write(rockText), Write(paperText), Write(scissorsText),Write(opponent_text))
+        self.play(AnimationGroup(AnimationGroup(Transform(blueStart1, redRPS[0]), Transform(blueStart2, redRPS[1]), Transform(blueStart3, redRPS[2])), AnimationGroup(Write(rockText), Write(paperText), Write(scissorsText),Write(opponent_text)), lag_ratio=0.7))
+        opponent_text.add_updater(lambda z: z.move_to(redScissors.get_center()).shift(1.5*RIGHT))
         
         redRPSDuplicates = []
         for val in redRPS:
-            redRPSDuplicates.append([Circle(0.3, color=RED).move_to(val.get_center()) for _ in range(3)])
+            redRPSDuplicates.append([Circle(0.3, color=BLUE).move_to(val.get_center()) for _ in range(3)])
 
 
         flatRedRPSDuplicates = [item for ll in redRPSDuplicates for item in ll]
@@ -70,11 +101,11 @@ class RPS(Scene):
             redRPSTransforms.append([])
             for j in range(3):
                 if j == 0:
-                    redRPSTransforms[i].append(Transform(redRPSDuplicates[i][0], Circle(0.3, color=BLUE).move_to(redRPS[i].get_center()).shift(LEFT+2*DOWN)))
+                    redRPSTransforms[i].append(Transform(redRPSDuplicates[i][0], Circle(0.3, color=GREY).move_to(redRPS[i].get_center()).shift(LEFT+2*DOWN)))
                 elif j == 1:
-                    redRPSTransforms[i].append(Transform(redRPSDuplicates[i][1], Circle(0.3, color=BLUE).move_to(redRPS[i].get_center()).shift(2*DOWN)))
+                    redRPSTransforms[i].append(Transform(redRPSDuplicates[i][1], Circle(0.3, color=GREY).move_to(redRPS[i].get_center()).shift(2*DOWN)))
                 else:
-                    redRPSTransforms[i].append(Transform(redRPSDuplicates[i][2], Circle(0.3, color=BLUE).move_to(redRPS[i].get_center()).shift(RIGHT + 2*DOWN)))
+                    redRPSTransforms[i].append(Transform(redRPSDuplicates[i][2], Circle(0.3, color=GREY).move_to(redRPS[i].get_center()).shift(RIGHT + 2*DOWN)))
         
         
         lines = []
@@ -95,19 +126,59 @@ class RPS(Scene):
         flatLines = [item for line in lines for item in line]
         self.add(*flatLines)
         flatRedRPSTransforms = [item for sublist in redRPSTransforms for item in sublist]
-        player_text_2 = Tex("You", font_size=36).move_to(redRPS[i].get_center()).shift(2.5*RIGHT + 2*DOWN)
-        self.play(AnimationGroup(AnimationGroup(*flatRedRPSTransforms), Write(player_text_2), lag_ratio=0.5))
+        end_of_game_text = Tex("End of Game", font_size=28).move_to(redRPS[2].get_center()).shift(2.5*RIGHT + 2*DOWN)
 
-        self.wait(2)
-        
-        
+        rockVec = LEFT + 2*DOWN
+        scissorsVec = RIGHT + 2 * DOWN
+        rockText1 = Tex("Rock", font_size=20).rotate(np.arctan(rockVec[1] /rockVec[0])).move_to(lines[0][0].point_from_proportion(0.6) + 0.3 *UP)
+        paperText1 = Tex("Paper", font_size=20).rotate(-PI/2).move_to(lines[0][1].point_from_proportion(0.5) + 0.15 *RIGHT)
+        scissorsText1 = Tex("Scissors", font_size=20).rotate(np.arctan(scissorsVec[1] /scissorsVec[0])).move_to(lines[0][2].point_from_proportion(0.6) + 0.3 *UP)
+        rockText2 = Tex("Rock", font_size=20).rotate(np.arctan(rockVec[1] /rockVec[0])).move_to(lines[1][0].point_from_proportion(0.6) + 0.3 *UP)
+        paperText2 = Tex("Paper", font_size=20).rotate(-PI/2).move_to(lines[1][1].point_from_proportion(0.5) + 0.15 *RIGHT)
+        scissorsText2 = Tex("Scissors", font_size=20).rotate(np.arctan(scissorsVec[1] /scissorsVec[0])).move_to(lines[1][2].point_from_proportion(0.6) + 0.3 *UP)
+        rockText3 = Tex("Rock", font_size=20).rotate(np.arctan(rockVec[1] /rockVec[0])).move_to(lines[2][0].point_from_proportion(0.6) + 0.3 *UP)
+        paperText3 = Tex("Paper", font_size=20).rotate(-PI/2).move_to(lines[2][1].point_from_proportion(0.5) + 0.15 *RIGHT)
+        scissorsText3 = Tex("Scissors", font_size=20).rotate(np.arctan(scissorsVec[1] /scissorsVec[0])).move_to(lines[2][2].point_from_proportion(0.6) + 0.3 *UP)
+        rockText1.add_updater(lambda z: z.move_to(lines[0][0].point_from_proportion(0.7) + 0.3 *UP))
+        paperText1.add_updater(lambda z: z.move_to(lines[0][1].point_from_proportion(0.5) + 0.15 *RIGHT))
+        scissorsText1.add_updater(lambda z: z.move_to(lines[0][2].point_from_proportion(0.7) + 0.3 *UP))
+        rockText2.add_updater(lambda z: z.move_to(lines[1][0].point_from_proportion(0.7) + 0.3 *UP))
+        paperText2.add_updater(lambda z: z.move_to(lines[1][1].point_from_proportion(0.5) + 0.15 *RIGHT))
+        scissorsText2.add_updater(lambda z: z.move_to(lines[1][2].point_from_proportion(0.7) + 0.3 *UP))
+        rockText3.add_updater(lambda z: z.move_to(lines[2][0].point_from_proportion(0.7) + 0.3 *UP))
+        paperText3.add_updater(lambda z: z.move_to(lines[2][1].point_from_proportion(0.5) + 0.15 *RIGHT))
+        scissorsText3.add_updater(lambda z: z.move_to(lines[2][2].point_from_proportion(0.7) + 0.3 *UP))
+
+        end_of_game_text.add_updater(lambda z: z.move_to(redRPS[2].get_center()).shift(2.5*RIGHT + 2 * DOWN))
+        self.play(AnimationGroup(AnimationGroup(*flatRedRPSTransforms), AnimationGroup(Write(end_of_game_text), 
+        Write(rockText1), Write(rockText2), Write(rockText3), Write(paperText1), Write(paperText2), Write(paperText3), Write(scissorsText1), Write(scissorsText2), Write(scissorsText3)
+        ), lag_ratio=0.7))
+        self.wait(1)
         # merge the nodes to show that we don't know
         """
         Steps:
         1. Replace text with question mark
         2. Move red nodes into one
         """
-        self.play(redRock.animate.move_to(redPaper), redScissors.animate.move_to(redPaper))
+        # update the updaters so the lines can overlap
+        line1.clear_updaters()
+        line3.clear_updaters()
+        line1.add_updater(lambda z: z.become(Line(normalize(blueStart1.get_center() -  blueStart.get_center()) * 0.3 + blueStart.get_center(), normalize(-blueStart1.get_center() + blueStart.get_center()) * 0.3 + blueStart1.get_center())))
+        line3.add_updater(lambda z: z.become(Line(normalize(blueStart3.get_center() -  blueStart.get_center()) * 0.3 + blueStart.get_center(), normalize(-blueStart3.get_center() + blueStart.get_center()) * 0.3 + blueStart3.get_center())))
+        
+        # Remove the characters
+        self.play(FadeOut(rockText, paperText, scissorsText),
+            VGroup(redRPSDuplicates[0][0], redRPSDuplicates[0][1], redRPSDuplicates[0][2], redRPS[0],
+        ).animate.shift(redPaper.get_center() - redRPS[0].get_center()),
+        VGroup(redRPSDuplicates[2][0], redRPSDuplicates[2][1], redRPSDuplicates[2][2], redRPS[2],
+        ).animate.shift(redPaper.get_center() - redRPS[2].get_center()),
+        blueStart1.animate.shift(redPaper.get_center() - blueStart1.get_center()),
+        blueStart3.animate.shift(redPaper.get_center() - blueStart3.get_center()),
+        )
+        questionMark = Tex('?').next_to(line2, RIGHT)
+        self.play(Write(questionMark))
+        
+        # self.play(redRock.animate.move_to(redPaper), redScissors.animate.move_to(redPaper))
 
         # self.play(Create(bluePaper, blueRock, blueScissors))
 
@@ -144,16 +215,98 @@ class CFRText(Scene):
         self.wait(2)
         self.play(FadeOut(*self.mobjects))
 
+class hist(Scene):
+    """
+    Animation for the Histograms for the card abstraction
+    
+    """
+    def construct(self):
+        # distributions = np.random.random((10,5))
+        values = [0.3,0.5,0.2]
+        chart = BarChart(
+            values
+        )
+        self.play(Create(chart))
 
-class BetAbstraction(Scene):
+        values2 = [0.5,0.2,0.4]
+        chart2 = BarChart(
+            values
+        )
+        self.play(Transform(chart, chart2))
+
+
+class bet(Scene):
     """
     Idea: 
     Have a continuous line, and then bucket these bets into discrete values.
     
     """
     def construct(self):
-        tex
+        text_102 = Tex('102\$', font_size=64)
+        text_100 = Tex('100\$', font_size=64)
+        self.play(Transform(text_102, text_100))
+        # number_line = NumberLine(
+        #     x_range=[0, 100, 10],
+        #     length=10,
+        # )
+        # check_text = Tex('Check').next_to(number_line.n2p(0), DOWN)
+        # all_in_text = Tex('All-In').next_to(number_line.n2p(100), DOWN)
+        # self.play(AnimationGroup(Create(number_line), Write(check_text), Write(all_in_text), lag_ratio=0.3))
+        # self.wait(2)
         
+        start_node = Circle(0.3, color=BLUE).shift(2*UP)
+        target_nodes = VGroup(*[Circle(0.05, color=RED) for _ in range(60)])
+        target_nodes.arrange(RIGHT, buff=0.1).shift(2*DOWN)
+        lines = []
+        for i in range(60):
+            unit_v = normalize(target_nodes[i].get_center() - start_node.get_center())
+            lines.append(Line(start_node.get_center() + 0.3 * unit_v, target_nodes[i].get_center() - 0.05 * unit_v, color=GRAY))
+        Line(start_node)
+        self.play(Create(start_node))
+        self.play(Create(target_nodes), Create(VGroup(*lines)))
+        self.wait(2)
+
+        target_nodes_2 = VGroup(*[Circle(0.2, color=RED) for _ in range(10)])
+        target_nodes_2.arrange(RIGHT, buff=0.2).shift(2*DOWN)
+        lines2 = []
+        for i in range(10):
+            unit_v = normalize(target_nodes_2[i].get_center() - start_node.get_center())
+            lines2.append(Line(start_node.get_center() + 0.3 * unit_v, target_nodes_2[i].get_center() - 0.2 * unit_v, color=GRAY))
+        
+        self.play(Transform(VGroup(*target_nodes, *lines), VGroup(*target_nodes_2, *lines2)))
+
+
+        
+        
+class valueTemplate(Scene):
+    def construct(self):
+        number_line = NumberLine()
+        pointer = Vector(DOWN).shift(UP)
+        label = Tex("x")
+        label.add_updater(lambda m: m.next_to(pointer, UP))
+        
+        tracker = ValueTracker(0)
+        pointer.add_updater(lambda m: m.next_to(
+            number_line.n2p(tracker.get_value()), UP)
+        )
+        self.add(number_line, pointer, label)
+        tracker += 1.5
+        self.wait(1)
+        tracker -= 4
+        self.wait(0.5)
+        self.play(tracker.animate.set_value(5))
+    
+
+# class Histogram(Scene):
+#     """
+#     Create a template for this histogram, which you will be able to recycle in the future:
+#     """
+#     # Add Image
+#     corona= ImageMobject("assets/img/covid_19.png")
+#     corona.scale(1.2)
+#     corona.to_edge(RIGHT, buff=1)
+
+#     self.add(corona)
         
 
 
