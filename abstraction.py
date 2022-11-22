@@ -107,7 +107,7 @@ def initialize(X, n_clusters, seed):
 	initial_state = X[indices]
 	return initial_state
 
-def kmeans(
+def kmeans_custom(
 		X,
 		n_clusters,
 		distance='euclidean',
@@ -214,7 +214,7 @@ def kmeans(
 
 
 
-def kmeans_predict(
+def kmeans_custom_predict(
 		X,
 		centroids,
 		distance='euclidean',
@@ -332,7 +332,8 @@ def kmeans_search(X):
 	# convert to float
 	X = X.float()
 
-	n_clusters = [10, 25, 50, 100, 200, 1000]
+	# n_clusters = [10, 25, 50, 100, 200, 1000, 5000]
+	n_clusters = [5000]
 	for n_cluster in n_clusters:
 		cluster_indices, centroids = kmeans(X, n_cluster)
 		X_cluster_centroids = centroids[cluster_indices]
@@ -590,6 +591,7 @@ def get_filenames(folder, extension='.npy'):
 
 	
 import argparse
+from sklearn.cluster import KMeans
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Generate Poker Hand Abstractions.")
 	parser.add_argument("-g", "--generate",
@@ -622,27 +624,25 @@ if __name__ == "__main__":
 	
 	if clustering:
 		raw_dataset_filenames = sorted(get_filenames(f'data/raw/{stage}'))
-		filename = raw_dataset_filenames[1] # Take the most recently generated dataset to run our clustering on
+		filename = raw_dataset_filenames[-1] # Take the most recently generated dataset to run our clustering on
 		
 		equity_distributions = np.load(f'data/raw/{stage}/{filename}')
 		print(filename)
 		if not os.path.exists(f'data/clusters/{stage}/{filename}'):
 			print(f"Generating the cluster for the {stage}")
 			print(filename)
-			cluster_indices, centroids = kmeans(equity_distributions, n_clusters=10) # Perform Clustering
+			kmeans = KMeans(100) # 100 Clusters seems good using the Elbow Method, see notebook/abstraction.ipynb for exploration
+			kmeans.fit(equity_distributions) # Perform Clustering
+			centroids = kmeans.cluster_centers_
 			joblib.dump(centroids, f'data/clusters/{stage}/{filename}')
 		else: # Centroids have already been generated, just load them, which are tensors
-			print(equity_distributions)
-			kmeans_search(equity_distributions)
 			centroids = joblib.load(f'data/clusters/{stage}/{filename}')
+			# Load KMeans Model
+			kmeans = KMeans(100)
+			kmeans.cluster_centers_ = centroids
+			kmeans._n_threads = -1
 		
 		
-		sorted_centroids = centroids[centroids[:, 0].argsort()]
-		# sorted_centroids, indices = torch.argsort(centroids, dim=0)
-		print(sorted_centroids)
-		cluster_indices = kmeans_predict(equity_distributions,  centroids)
-		
-
 		# # Visualization of the hands
 		# hands = joblib.load(f'data/raw/{stage}/{filename.split(".")[0]}')  
 		# for i in range(equity_distributions.shape[0]):

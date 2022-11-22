@@ -219,6 +219,13 @@ class hist(Scene):
     """
     Animation for the Histograms for the card abstraction
     
+    Idea:
+    Start with the cards on each node.
+    Then, you use a histogram representation.
+    
+
+
+    
     """
     def construct(self):
         # distributions = np.random.random((10,5))
@@ -276,8 +283,6 @@ class bet(Scene):
         self.play(Transform(VGroup(*target_nodes, *lines), VGroup(*target_nodes_2, *lines2)))
 
 
-        
-        
 class valueTemplate(Scene):
     def construct(self):
         number_line = NumberLine()
