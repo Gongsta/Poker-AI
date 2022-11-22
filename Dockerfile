@@ -17,3 +17,5 @@ RUN conda install pytorch==1.10.1 torchvision==0.11.2 torchaudio==0.10.1 cudatoo
 RUN mkdir /Poker-AI
 COPY requirements.txt /Poker-AI/requirements.txt
 RUN pip install -r /Poker-AI/requirements.txt
+
+WORKDIR /Poker-AI
