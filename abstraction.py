@@ -303,7 +303,13 @@ def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_avail
 	dist = torch.zeros((data1.shape[0], data2.shape[0]))
 	for i, hist_a in enumerate(data1):
 		for j, hist_b in enumerate(data2):
-			ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max") # NOTE: I overwrite the original python package to reduce the level of precision required to 5
+			for _ in range(5):  # Janky fix for small precision error
+				try:
+					ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max")  # The precision is set to 7, so sometimes the sum doesn't get to precisely 1. 
+					break
+				except:
+					continue
+				
 			transport_cost_matrix = ot_emd * C
 			dist[i][j] = transport_cost_matrix.sum()
 	
