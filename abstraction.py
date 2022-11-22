@@ -110,7 +110,7 @@ def initialize(X, n_clusters, seed):
 def kmeans(
 		X,
 		n_clusters,
-		distance='EMD',
+		distance='euclidean',
 		centroids=[],
 		tol=1e-3,
 		tqdm_flag=True,
@@ -217,7 +217,7 @@ def kmeans(
 def kmeans_predict(
 		X,
 		centroids,
-		distance='EMD',
+		distance='euclidean',
 		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
 		tqdm_flag=True
 ):
@@ -300,18 +300,20 @@ def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_avail
 	C = ot.dist(pos_a, pos_b, metric='euclidean')
 	C.to(device)
 
-	dist = torch.zeros((data1.shape[0], data2.shape[0]))
-	for i, hist_a in enumerate(data1):
-		for j, hist_b in enumerate(data2):
-			for _ in range(5):  # Janky fix for small precision error
-				try:
-					ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max")  # The precision is set to 7, so sometimes the sum doesn't get to precisely 1. 
-					break
-				except:
-					continue
+	# # Correct solution, but too slow
+	# dist = torch.zeros((data1.shape[0], data2.shape[0]))
+	# for i, hist_a in enumerate(data1):
+	# 	for j, hist_b in enumerate(data2):
+	# 		for _ in range(10):  # Janky fix for small precision error
+	# 			try:
+	# 				ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max")  # The precision is set to 7, so sometimes the sum doesn't get to precisely 1. 
+	# 				break
+	# 			except Exception as e:
+	# 				print(e)
+	# 				continue
 				
-			transport_cost_matrix = ot_emd * C
-			dist[i][j] = transport_cost_matrix.sum()
+	# 		transport_cost_matrix = ot_emd * C
+	# 		dist[i][j] = transport_cost_matrix.sum()
 	
 	return dist
 
@@ -325,13 +327,20 @@ def kmeans_search(X):
 	"""
 	# Search for the optimal number of clusters through a grid like search
 
-	n_clusters = [10, 25, 50, 100, 200]
+	if type(X) != torch.Tensor:
+		X = torch.tensor(X)
+	# convert to float
+	X = X.float()
+
+	n_clusters = [10, 25, 50, 100, 200, 1000]
 	for n_cluster in n_clusters:
 		cluster_indices, centroids = kmeans(X, n_cluster)
-		distances = pairwise_EMD(centroids, centroids) 
-		print("inter cluster distances")
-		print(distances)
-		print(distances.max(), distances.min())
+		X_cluster_centroids = centroids[cluster_indices]
+		distances = 0
+		for i, X_cluster_centroid in enumerate(X_cluster_centroids):
+			distances += pairwise_distance(torch.unsqueeze(X_cluster_centroid, axis=0), torch.unsqueeze(X[i], axis=0), tqdm_flag=False)
+		print(f"Sum of cluster to data distance {distances}")
+		print(f"Mean cluster to data distance {distances / X_cluster_centroids.shape[0]}")
 
 
 	
@@ -613,7 +622,7 @@ if __name__ == "__main__":
 	
 	if clustering:
 		raw_dataset_filenames = sorted(get_filenames(f'data/raw/{stage}'))
-		filename = raw_dataset_filenames[-1] # Take the most recently generated dataset to run our clustering on
+		filename = raw_dataset_filenames[1] # Take the most recently generated dataset to run our clustering on
 		
 		equity_distributions = np.load(f'data/raw/{stage}/{filename}')
 		print(filename)
