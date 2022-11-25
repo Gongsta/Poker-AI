@@ -300,20 +300,20 @@ def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_avail
 	C = ot.dist(pos_a, pos_b, metric='euclidean')
 	C.to(device)
 
-	# # Correct solution, but too slow
-	# dist = torch.zeros((data1.shape[0], data2.shape[0]))
-	# for i, hist_a in enumerate(data1):
-	# 	for j, hist_b in enumerate(data2):
-	# 		for _ in range(10):  # Janky fix for small precision error
-	# 			try:
-	# 				ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max")  # The precision is set to 7, so sometimes the sum doesn't get to precisely 1. 
-	# 				break
-	# 			except Exception as e:
-	# 				print(e)
-	# 				continue
+	# Correct solution, but very slow
+	dist = torch.zeros((data1.shape[0], data2.shape[0]))
+	for i, hist_a in enumerate(data1):
+		for j, hist_b in enumerate(data2):
+			for _ in range(10):  # Janky fix for small precision error
+				try:
+					ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max")  # The precision is set to 7, so sometimes the sum doesn't get to precisely 1. 
+					break
+				except Exception as e:
+					print(e)
+					continue
 				
-	# 		transport_cost_matrix = ot_emd * C
-	# 		dist[i][j] = transport_cost_matrix.sum()
+			transport_cost_matrix = ot_emd * C
+			dist[i][j] = transport_cost_matrix.sum()
 	
 	return dist
 
@@ -345,11 +345,6 @@ def kmeans_search(X):
 
 
 	
-
-
-
-
-
 
 
 
@@ -561,6 +556,7 @@ def generate_postflop_equity_distributions(n_samples, bins,stage=None, save=True
 	if save:
 		create_abstraction_folders()
 		file_id = int(time.time()) # Use the time as the file_id
+		# TODO: Change to joblib saving for consistency everywhere
 		with open(f'data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy', 'wb') as f:
 			np.save(f, equity_distributions)
 		joblib.dump(hands, f'data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
@@ -626,12 +622,12 @@ if __name__ == "__main__":
 		raw_dataset_filenames = sorted(get_filenames(f'data/raw/{stage}'))
 		filename = raw_dataset_filenames[-1] # Take the most recently generated dataset to run our clustering on
 		
-		equity_distributions = np.load(f'data/raw/{stage}/{filename}')
+		equity_distributions = np.load(f'data/raw/{stage}/{filename}') # TODO: Switch to joblib
 		print(filename)
 		if not os.path.exists(f'data/clusters/{stage}/{filename}'):
 			print(f"Generating the cluster for the {stage}")
 			print(filename)
-			kmeans = KMeans(100) # 100 Clusters seems good using the Elbow Method, see notebook/abstraction.ipynb for exploration
+			kmeans = KMeans(100) # 100 Clusters seems good using the Elbow Method, see notebook/abstraction_exploration.ipynb
 			kmeans.fit(equity_distributions) # Perform Clustering
 			centroids = kmeans.cluster_centers_
 			joblib.dump(centroids, f'data/clusters/{stage}/{filename}')
