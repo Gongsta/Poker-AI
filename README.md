@@ -1,5 +1,5 @@
 # Poker-AI
-Developing an AI agent from scratch to play Heads Up Texas Hold'Em Poker (i.e. 2-player version) using Monte-Carlo Counterfactual Regret Minimization (MCCFR) with Chance Sampling (CS), game abstractions with Earth Mover's Distance, and Depth-Limited Solving (real-time improvement).
+Developing an AI agent from scratch to play Heads Up Texas Hold'Em Poker (i.e. 2-player version) using Monte-Carlo Counterfactual Regret Minimization (MCCFR) with Chance Sampling (CS), game abstractions with using K-Means Clustering, and Depth-Limited Solving (real-time improvement).
 
 **Motivation**: Poker is an interesting game to work on because it is an imperfect information game. This means that unlike perfect-information games such as Chess, in Poker, there is this uncertainty about the opponent's hand, which allows really interesting plays like Bluffing.
 
@@ -7,12 +7,16 @@ I have been incrementally developing the Poker bot, starting with Kuhn Poker whi
 
 I might need to write C++ code, since training on the Python code might take a very long time.
 
+Also a blog series will be coming out to explain how this codebase works.
+
 ### Installation
 This repository requires Python>=3.9.
-
+```bash
+pip install -r requirements.txt
+```
 
 ### Basic Explanations of the Game + Class Definitions
-Poker is a a family comparing card games in which players wager over which hand is best according to that specific game's rules in ways similar to these rankings. The goal of the game is to win as much money as possible. Unlike other games like Blackjack where players work together and try to beat the "house" (i.e. the casino), Poker is a game in which players try to beat each other.
+Poker is a family of comparing card games in which players wager over which hand is best according to that specific game's rules in ways similar to these rankings. The goal of the game is to win as much money as possible. Unlike other games like Blackjack where players work together and try to beat the "house" (i.e. the casino), Poker is a game in which players try to beat each other.
 
 The version of Poker I am going to be using is **No Limit Texas Hold’Em** (NLTHE), this is by far the most popular one used in all the major tournaments. You can familiarize yourself with the rules [here](https://www.pokernews.com/poker-rules/texas-holdem.htm).
 
@@ -33,16 +37,33 @@ Class Definitions
 - `/assets` contains assets used to run Poker on PyGame
 - `/research` contains more background information and code that I wrote before writing the full-on Heads-On Poker
 
-
 ### High-Level overview of how this AI tries to beat Poker
-The main idea of the Poker algorithm is storing a strategy profile for "every possible scenario" to maximize our reward at all stages of a poker round. In Poker No-Limit Hold'Em has, this means we would store $10^{161}$ sets of
-strategy profiles. That is simply not feasible. Hence, the first step is to find a way to abstract scenarios.
+The main idea of the Poker algorithm is storing a strategy profile for "every possible scenario" to maximize our reward at all stages of a poker round. 
+- A "Strategy profile" means defining how the AI should behave. For example, if you had pocket aces on the pre-flop, and you are the big blind, a strategy profile might tell you that you should make a pot-size raise 50% of the time, and go all-in the other 50% of the time.
 
-There are two common types of abstraction: information (i.e. cards) abstraction and action (i.e. bet size) abstraction. 
+However, Poker No-Limit Hold'Em is an extremely large game. This means we would have to store $10^{161}$ sets of strategy profiles. That is simply not feasible. Hence, the first step is to find a way to group scenarios together so there are less scenarios to keep track off. We are thus solving a smaller game.
+
+After we've created an abstract version of the game that is smaller, we solve it directly using an algorithm called Counterfactual Regret Minimization (CFR).
+
+Finally, we implement depth-limited solving, which is a real-time search algorithm invented in 2018 that drastically improves the performance of the AI and helps it make better decisions and have it be less vulnerable.
+
+
+#### Step 1: Abstraction
+There are two common types of abstraction: information (i.e. cards) abstraction and action (i.e. bet size) abstraction.
 
 For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. 
 
 Card Abstractions are done by grouping hands with similar equity distributions into the same bucket/cluster/node. Equity is a measure of expected hand strength, which is your probability of winning given a uniform random rollout of community cards and random opponent private cards.The idea is based from this [paper](https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf), which talks about potential-aware and distribution aware card abstractions. In this project, cards are bucketed in 169 clusters (pre-flop), TBD (flop), TBD (turn), and TBD (river). 
+
+#### Step 2: Generate a Blueprint Strategy with CFR
+Counterfactual Regret Minimization (CFR) is a self-play algorithm used to learn a strategy to a game by repeatedly playing a game and updating its strategy to improve how much it "regret" taking a decision at a each decision point. This strategy has been wildly successful for imperfect information games like poker. 
+
+[CFR](https://www.quora.com/What-is-an-intuitive-explanation-of-counterfactual-regret-minimization) has been shown to converge to Nash Equilibrium strategy for 2 player zero-sum games. 
+
+[Here](http://modelai.gettysburg.edu/2013/cfr/cfr.pdf) is a great resource for the curious reader.
+
+##### Step 3: Real-time Solving with Depth-Limited Search
+To be implemented. The idea is that we can improve our strategies in realtime.
 
 ### Concepts
 ##### Evaluating Performance

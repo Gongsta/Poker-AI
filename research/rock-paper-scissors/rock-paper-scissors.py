@@ -1,6 +1,9 @@
 """
-Wrote this script to illustrate why reinforcement learning doesn't work on RPS, 
+Wrote this script to convince myself that reinforcement learning doesn't work on RPS, 
 (because it outputs a deterministic strategy, which can be easily exploited).
+
+However, I think there are certain techniques like Robust Reinforcement Learning that might
+work on Poker. I haven't looked into it. 
 """
 import gym
 from gym import spaces
