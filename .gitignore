@@ -1,3 +1,4 @@
+*.out
 # Local Files
 animation/media 
 .DS_Store

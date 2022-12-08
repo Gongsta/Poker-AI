@@ -43,8 +43,22 @@ class bits(Scene):
         # self.play(ReplacementTransform(bits_with_cards, clubs_02))
 
 
-
 class RPS(Scene):
+    def construct(self):
+        rock = ImageMobject('assets/rock.png').scale(1.5).rotate(-PI/2)
+        paper = ImageMobject('assets/paper.png').scale(1.5).rotate(PI/2)
+        scissors = ImageMobject('assets/scissors.png').scale(1.5).rotate(PI/2)
+        group = [rock, paper, scissors]
+        your_score = ValueTracker(0)
+        opponent_score = ValueTracker(0)
+        
+        for i in range(100):
+            choice_player = np.random.randint(0,3)
+            choice_opponent = np.random.randint(0,3)
+            self.play(FadeIn(group[choice_player].shift(2*LEFT), group[choice_opponent].shift(2*RIGHT)))
+        # self.play(UpdateFromFunc())
+
+class RPS2(Scene):
     def construct(self):
         rpsText = Tex("Rock Paper Scissors", font_size=100)
         self.play(Write(rpsText))

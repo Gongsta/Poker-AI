@@ -27,31 +27,51 @@ if __name__ == "__main__":
 			plot_equity_hist(equity_hist, player_cards, community_cards)
 		
 	else:
-		player_cards = input("Input your cards (ex: Ac 7h): ")
-		player_cards = player_cards.split(" ")
-		assert(len(player_cards) == 2)
-		community_cards = input("Input the cards on the board (ex: 5h Ah 3c). If none, press enter: ")
-		if community_cards == '':
-			community_cards = []
-		else:
+		while True:
+			player_cards = []
+			while len(player_cards) != 2:
+				player_cards = input("Input your cards (ex: Ac 7h): ")
+				player_cards = player_cards.split(" ")
+
+			equity = calculate_equity(player_cards, [], n=10000) # We want this to be really accurate
+			print("Pre-Flop Equity: {:.2f}%".format(equity * 100))
+			community_cards = input("Flop Cards: ")
 			community_cards = community_cards.split(" ")
+			if len(community_cards) != 3:
+				continue
+				
+			# opponent_cards = input("(Optional) Input your guess of your opponent's cards (ex: Ac 7h): ")
+			# if opponent_cards == '':
+			# 	opponent_cards = []
+			# else:
+			# 	opponent_cards = opponent_cards.split(" ")
 
-		opponent_cards = input("(Optional) Input your guess of your opponent's cards (ex: Ac 7h): ")
-		if opponent_cards == '':
-			opponent_cards = []
-		else:
-			opponent_cards = opponent_cards.split(" ")
+			# equity_hist = calculate_equity_distribution(player_cards, community_cards)
+			# plot_equity_hist(equity_hist)
+			equity = calculate_equity(player_cards, community_cards, n=10000) # We want this to be really accurate
+			print("Flop Equity: {:.2f}%".format(equity * 100))
 
+			turn_card = input("Turn Card: ")
+			if turn_card == "e":
+				continue
+			else:
+				community_cards.append(turn_card)
+			equity = calculate_equity(player_cards, community_cards, n=10000) # We want this to be really accurate
+			print("Turn Equity: {:.2f}%".format(equity * 100))
 
-		# equity_hist = calculate_equity_distribution(player_cards, community_cards)
-		# plot_equity_hist(equity_hist)
-		equity = calculate_equity(player_cards, community_cards, n=10000) # We want this to be really accurate
-		print("If you don't know your opponents hands, you have a {:.2f}% equity (probability of winning + 1/2 probability of chopping)".format(equity * 100))
+			river_card = input("River Card: ")
+			if turn_card == "e":
+				continue
+			else:
+				community_cards.append(river_card)
+			equity = calculate_equity(player_cards, community_cards, n=10000) # We want this to be really accurate
+			print("River Equity: {:.2f}%".format(equity * 100))
+			# if len(opponent_cards) == 2:
+			# 	player_probability, opponent_probability = calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10000)
+			# 	print("\nAssuming you know your opponent's cards, You have a {:.2f}% equity".format(player_probability * 100))
+			# 	print("Your opponent has a {:.2f}% equity\n".format(opponent_probability * 100))
+			
+			print("\n")
+			
 
-		if len(opponent_cards) == 2:
-			player_probability, opponent_probability = calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10000)
-			print("\nAssuming you know your opponent's cards, You have a {:.2f}% equity".format(player_probability * 100))
-			print("Your opponent has a {:.2f}% equity\n".format(opponent_probability * 100))
-		
-
-		
+			

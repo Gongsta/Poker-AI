@@ -12,15 +12,34 @@ from leduc.node import MNode as Node
 from leduc.card import Card
 from leduc.hand_eval import leduc_eval
 from leduc.util import expected_utility, bias
+from leduc.state import State
 
-STRAT_INTERVAL = 100
-PRUNE_THRESH = 200
-DISCOUNT = 10
-LCFR_INTERVAL = 400
-REGRET_MIN = -300000
+STRAT_INTERVAL = 100  # How often to update the strategy
+PRUNE_THRESH = 200 # Threshold for pruning
+DISCOUNT = 10 # TODO: Understand what this discount does?
+LCFR_INTERVAL = 400 # TODO: Understand what this function does
+REGRET_MIN = -300000 # Clip the regrets to avoid numerical instability
 
 
-def learn(iterations, cards, num_cards, node_map, action_map):
+def learn(iterations: int, cards: list, num_cards: int, node_map: dict, action_map: dict):
+    """
+    Main loop for training Leduc Monte Carlo CFR.
+    
+    Parameters
+    ----------
+    iterations : int
+        The number of iterations to run the algorithm for.
+    cards : list
+        A list of all possible cards.
+    num_cards : int
+        The number of cards that each player has at showdown.
+    node_map : dict
+        A dictionary of nodes for each player.
+    action_map : dict
+        A dictionary of actions for each player.
+    """
+    
+    # This function supports two versions of the game: Leduc and Kuhn
     if len(cards) > 4:
         from leduc.state import Leduc as State
         from leduc.hand_eval import leduc_eval as eval
@@ -28,17 +47,22 @@ def learn(iterations, cards, num_cards, node_map, action_map):
         from leduc.state import State
         from leduc.hand_eval import kuhn_eval as eval
 
-    all_combos = [list(t) for t in set(permutations(cards, num_cards))]
+    # Generate all possible combinations of cards. This is not feasible for larger games where there are too many combinations to store in memory
+    # TODO: Add fix for larger games
+    all_combos = [list(t) for t in set(permutations(cards, num_cards))] 
     num_players = len(node_map)
-    for i in tqdm(range(1, iterations + 1), desc="learning"):
+
+    # MAIN TRAINING LOOP
+    for i in tqdm(range(iterations), desc="learning"):
         card = np.random.choice(len(all_combos))
         for player in range(num_players):
-            state = State(all_combos[card], num_players, eval)
-            if i % STRAT_INTERVAL == 0:
+            # TODO: Look into optimality
+            state = State(all_combos[card], num_players, eval) 
+            if i % STRAT_INTERVAL == 0: 
                 update_strategy(player, state, node_map, action_map)
 
             if i > PRUNE_THRESH:
-                chance = np.random.rand()
+                chance = np.random.rand() 
                 if chance < .05:
                     accumulate_regrets(player, state, node_map, action_map)
                 else:
@@ -58,7 +82,19 @@ def learn(iterations, cards, num_cards, node_map, action_map):
                                          key, value in node.strategy_sum.items()}
 
 
-def update_strategy(traverser, state, node_map, action_map):
+def update_strategy(player: int, state: State, node_map: dict, action_map: dict):
+    """
+    Update the strategy for the given player based on the state.
+
+    Parameters
+    ----------
+    player : int
+        The player to update the strategy for. Either 0 or 1.
+    state : State
+    node_map : dict
+    action_map : dict
+    
+    """
     if state.terminal:
         return
 
@@ -76,22 +112,35 @@ def update_strategy(traverser, state, node_map, action_map):
     node = node_map[turn][info_set]
     strategy = node.strategy()
 
-    if turn == traverser:
+    if turn == player:
         actions = list(strategy.keys())
         probs = list(strategy.values())
         random_action = actions[np.random.choice(len(actions), p=probs)]
         node.strategy_sum[random_action] += 1
         new_state = state.take(random_action, deep=True)
 
-        update_strategy(traverser, new_state, node_map, action_map)
+        update_strategy(player, new_state, node_map, action_map)
 
     else:
         for action in valid_actions:
             new_state = state.take(action, deep=True)
-            update_strategy(traverser, new_state, node_map, action_map)
+            update_strategy(player, new_state, node_map, action_map)
 
 
-def accumulate_regrets(traverser, state, node_map, action_map, prune=False):
+def accumulate_regrets(player: int, state: State, node_map: dict, action_map: dict, prune=False):
+    """
+    Accumulate the regrets for the given player based on the state.
+    
+    Parameters
+    ----------
+    player : int
+    state : State
+    node_map : dict
+    action_map : dict
+    prune : bool
+        Whether to prune the tree or not. Default is False.
+    
+    """
     if state.terminal:
         util = state.utility()
         return util
@@ -110,7 +159,7 @@ def accumulate_regrets(traverser, state, node_map, action_map, prune=False):
     node = node_map[turn][info_set]
     strategy = node.strategy()
 
-    if turn == traverser:
+    if turn == player:
         util = {a: 0 for a in valid_actions}
         node_util = np.zeros(len(node_map))
         explored = set(valid_actions)
@@ -120,7 +169,7 @@ def accumulate_regrets(traverser, state, node_map, action_map, prune=False):
                 explored.remove(action)
             else:
                 new_state = state.take(action, deep=True)
-                returned = accumulate_regrets(traverser, new_state, node_map,
+                returned = accumulate_regrets(player, new_state, node_map,
                                               action_map, prune=prune)
 
                 util[action] = returned[turn]
@@ -137,11 +186,12 @@ def accumulate_regrets(traverser, state, node_map, action_map, prune=False):
         probs = list(strategy.values())
         random_action = actions[np.random.choice(len(actions), p=probs)]
         new_state = state.take(random_action, deep=True)
-        return accumulate_regrets(traverser, new_state, node_map, action_map,
+        return accumulate_regrets(player, new_state, node_map, action_map,
                                   prune=prune)
 
 class Search:
-    def __init__(self, state, blueprint, actions, cards, num_cards):                                  
+    # TODO: This is not depth-limited solving. I think I will just implement my own version.
+    def __init__(self, state: State, blueprint, actions, cards, num_cards: int):                                  
         self.blueprint = blueprint
         self.action_map = actions
         self.cards = cards
@@ -152,7 +202,6 @@ class Search:
         self.all_combos = [list(t) for t in set(permutations(self.cards, self.num_cards))]
 
     def search(self):
-
         starting_state = deepcopy(self.state)
         node_map = deepcopy(self.blueprint)
         action_map = deepcopy(self.action_map)
@@ -188,7 +237,7 @@ class Search:
         return node_map 
 
 
-    def update_strategy_search(self, traverser, state, node_map, action_map, continuation, leaf=False):
+    def update_strategy_search(self, player, state: State, node_map, action_map, continuation, leaf=False):
         if state.terminal:
             return
 
@@ -213,7 +262,7 @@ class Search:
 
         strategy = node.strategy()
 
-        if turn == traverser:
+        if turn == player:
             actions = list(strategy.keys())
             probs = list(strategy.values())
             random_action = actions[np.random.choice(len(actions), p=probs)]
@@ -221,18 +270,18 @@ class Search:
             new_state = state.take(random_action, deep=True)
 
             if leaf is False:
-                self.update_strategy_search(traverser, new_state, node_map, action_map, continuation,
+                self.update_strategy_search(player, new_state, node_map, action_map, continuation,
                                     leaf=new_state.round!=state.round)
 
         else:
             if leaf is False:
                 for action in valid_actions:
                     new_state = state.take(action, deep=True)
-                    self.update_strategy_search(traverser, new_state, node_map, action_map, continuation,
+                    self.update_strategy_search(player, new_state, node_map, action_map, continuation,
                                     leaf=new_state.round!=state.round)
 
 
-    def accumulate_regrets_search(self, traverser, state, node_map, action_map, continuations, prune=False, leaf=False):
+    def accumulate_regrets_search(self, player, state, node_map, action_map, continuations, prune=False, leaf=False):
         if state.terminal:
             util = state.utility()
             return util
@@ -261,7 +310,7 @@ class Search:
 
         strategy = node.strategy()
 
-        if turn == traverser:
+        if turn == player:
             util = {a: 0 for a in valid_actions}
             node_util = np.zeros(len(node_map))
             explored = set(valid_actions)
@@ -271,10 +320,10 @@ class Search:
                     explored.remove(action)
                 else:
                     if leaf is True:
-                        returned = self.rollout(traverser, state, action)
+                        returned = self.rollout(player, state, action)
                     else:
                         new_state = state.take(action, deep=True)
-                        returned = self.accumulate_regrets_search(traverser, new_state, node_map, action_map, continuations,
+                        returned = self.accumulate_regrets_search(player, new_state, node_map, action_map, continuations,
                                                                   prune=prune, leaf=new_state.round!=state.round) 
                     util[action] = returned[turn]
                     node_util += returned * strategy[action]
@@ -287,14 +336,14 @@ class Search:
 
         else:
             if leaf is True:
-                return self.rollout(traverser, state, "NULL") 
+                return self.rollout(player, state, "NULL") 
 
                 
             actions = list(strategy.keys())
             probs = list(strategy.values())
             random_action = actions[np.random.choice(len(actions), p=probs)]
             new_state = state.take(random_action, deep=True)
-            return self.accumulate_regrets_search(traverser, new_state, node_map, action_map, continuations,
+            return self.accumulate_regrets_search(player, new_state, node_map, action_map, continuations,
                                                   prune=prune, leaf=new_state.round!=state.round)
     def rollout(self, player, state, contin_strat):
         node_map = self.blueprint

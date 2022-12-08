@@ -7,3 +7,4 @@ torch
 matplotlib
 pot # Not really needed, I found it to be too slow
 scikit-learn
+labml

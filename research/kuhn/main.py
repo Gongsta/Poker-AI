@@ -24,7 +24,7 @@ from train import Node
 PLAYER = 0
 AI = 1
 
-def getAction(strategy):
+def get_action(strategy):
 	r = np.random.random()
 	cumulativeProbability = 0
 	action = 0
@@ -38,15 +38,15 @@ def getAction(strategy):
 	else:
 		return 'b'
 		
-def getStrategy(card, strategy=0):
+def get_strategy(card, strategy=0):
 	"""
-	stragegy=0 -> Pass if you have 1, Bet if you have 3, and play 50% of your hands with 2
-	stragegy=1 -> Always pass
-	stragegy=2 -> Always bet
-	strategy=3 -> CFR
+	strategy=0 -> CFR
+	stragegy=1 -> Pass if you have 1, Bet if you have 3, and play 50% of your hands with 2
+	stragegy=2 -> Always pass
+	stragegy=3 -> Always bet
 	"""
 	if strategy == 0:
-		return getAction(nodeMap[str(card)].getAverageStrategy())
+		return get_action(nodeMap[str(card)].getAverageStrategy())
 	elif strategy == 1:
 		if card == 1:
 			return 'p'
@@ -73,7 +73,11 @@ def terminal(history):
 if __name__ == "__main__":
 	score = [0, 0] # [PLAYER_SCORE, AI_SCORE]
 	# Load the nodeMap
-	nodeMap: Node = joblib.load("KuhnNodeMap.joblib")
+	try:
+		nodeMap: Node = joblib.load("KuhnNodeMap.joblib")
+	except:
+		print("Could not load nodeMap. Please train the model first by running: python main.py")
+		exit()
 	
 	first_player_to_move = 0
 
@@ -112,9 +116,9 @@ if __name__ == "__main__":
 			if user_input: # Manual Input
 				action = input('Please decide whether to pass or bet ("p" or "b"): ')
 			else: # Get a hardcoded trategy
-				action = getStrategy(cards[0], 1)
+				action = get_strategy(cards[0], 1)
 		else:
-			action = getStrategy(cards[1])
+			action = get_strategy(cards[1])
 			if user_input or verbose:
 				print("Your opponent has decided to play:", action)
 
@@ -128,9 +132,9 @@ if __name__ == "__main__":
 				if user_input:
 					action = input('Please decide whether to pass or bet ("p" or "b"): ')
 				else:
-					action = getStrategy(cards[0], 1)
+					action = get_strategy(cards[0], 1)
 			else:
-				action = getStrategy(cards[1])
+				action = get_strategy(cards[1])
 				if user_input or verbose:
 					print("Your opponent has decided to play:", action)
 			

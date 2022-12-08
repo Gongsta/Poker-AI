@@ -2,7 +2,6 @@ import numpy as np
 
 from itertools import permutations
 
-
 def exploitability(cards, num_cards, node_map, action_map):
     if len(cards) > 4:
         from leduc.state import Leduc as State
