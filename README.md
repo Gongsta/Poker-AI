@@ -51,9 +51,15 @@ Finally, we implement depth-limited solving, which is a real-time search algorit
 #### Step 1: Abstraction
 There are two common types of abstraction: information (i.e. cards) abstraction and action (i.e. bet size) abstraction.
 
-For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. 
+For action abstraction, you size the bets according to how much money is currently being put into the pot. See the `holdem.py` python file for more details.
 
 Card Abstractions are done by grouping hands with similar equity distributions into the same bucket/cluster/node. Equity is a measure of expected hand strength, which is your probability of winning given a uniform random rollout of community cards and random opponent private cards.The idea is based from this [paper](https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf), which talks about potential-aware and distribution aware card abstractions. In this project, cards are bucketed in 169 clusters (pre-flop), TBD (flop), TBD (turn), and TBD (river). 
+
+
+
+
+Slumbot abstractions:
+https://nanopdf.com/queue/slumbot-nl-solving-large-games-with-counterfactual_pdf?queue_id=-1&x=1670505293&z=OTkuMjA5LjUyLjEzOA==
 
 #### Step 2: Generate a Blueprint Strategy with CFR
 Counterfactual Regret Minimization (CFR) is a self-play algorithm used to learn a strategy to a game by repeatedly playing a game and updating its strategy to improve how much it "regret" taking a decision at a each decision point. This strategy has been wildly successful for imperfect information games like poker. 
@@ -106,7 +112,8 @@ How to evaluate the performance of the Poker AI? There are 3 main ways to measur
 
 ##### 4. Future Steps
 - [ ] Implement Computer Vision + Deep Learning to recognize Poker cards, and so you can deploy this model in real life by mounting a camera to your head.
-- [ ] Use this project as a personal poker trainer (displaying the pot odds). Can help you refine your game
+- [ X ] Use this project as a personal poker trainer (displaying the pot odds). Can help you refine your game, see the `learn_pot_odds.py` file
+- [ X ] release CFR code as a library, since there is no universal support of CFR. I wish the researchers released those, but everyone seems to just do their own thing. It kind of seems like the early days of neural networks, when everyone would write their own backward pass for backpropagation, until Tensorflow and Pytorch came along.
 
 
 ## Resources
