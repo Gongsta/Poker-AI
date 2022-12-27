@@ -35,13 +35,24 @@ class HoldEmHistory(base.History):
 	Minimum bet = 1 chip (0.5BB)
 	
 	The API for the history is inspired from the Slumbot API.
+	
+	I want to avoid all the extra overhead, so taking inspiration from `environment.py` with the `PokerEnvironment`
+
 
 	"""
 	def __init__(self, history: List[Action] = []):
 		super().__init__(history)
-		self.player_
+		
+		# How is this going to be taken account of, when we do training?
+		
+		# # The following values 
+		# self.player_0_balance = None
+		# self.player_1_balance = None
+		# self.total_pot_balance = None
+		# self.stage_pot_balance = None
 	
 	def is_terminal(self):
+		if len(self.history) == 0: return False
 		folded = self.history[-1] == 'f'
 		is_showdown = self.history.count('/') == 3 and self.history[-1] == 'c' # Showdown, since one of the players is calling
 		if folded or is_showdown:
@@ -65,7 +76,11 @@ class HoldEmHistory(base.History):
 				current_cards.append(action[2:4]) # Private card 2
 
 	def get_current_game_stage_history(self):
-		game_stage_start = 0
+		"""
+		return current_game_stage_history, stages[stage_i] excluding the community cards drawn. We only care about the actions 
+		of the players.
+		"""
+		game_stage_start = 2 # Because we are skipping the pairs of private cards drawn at the beginning of the round
 		stage_i = 0
 		stages = ['preflop', 'flop', 'turn', 'river']
 		for i, action in enumerate(self.history):
@@ -73,7 +88,7 @@ class HoldEmHistory(base.History):
 				game_stage_start = i + 2 # Skip the community card
 				stage_i += 1
 
-		if game_stage_start >= len(self.history) or game_stage_start == 0:
+		if game_stage_start >= len(self.history):
 			return [], stages[stage_i]
 		else:
 			current_game_stage_history = self.history[game_stage_start:]
@@ -82,7 +97,7 @@ class HoldEmHistory(base.History):
 	def actions(self):
 		if self.is_chance(): # Time to draw cards
 			if len(self.history) > 2 and self.history[-1] != '/':
-				return ['/'] # One must move onto a new game stage, though this is not a very elegant solution? TODO: Improve
+				return ['/'] # One must move onto a new game stage, this is what they do in slumbot as well
 			else:
 				cards_to_exclude = self.get_current_cards()
 				cards = Deck(cards_to_exclude)
@@ -94,57 +109,21 @@ class HoldEmHistory(base.History):
 			To limit this game going to infinity, I only allow for 3 betting rounds.
 			I.e. if I bet, you raise, I raise, you raise, then I must either call, fold, or all-in. Else the branching factor is going to be insane.
 			"""
-			# TODO: Investigate the effect of action abstraction on exploitability.
 
-			"""
-			
-			Daniel Negreanu: How Much Should You Raise? https://www.youtube.com/watch?v=WqRUyYQcc5U
-			Bet sizing: https://www.consciouspoker.com/blog/poker-bet-sizing-strategy/#:~:text=We%20recommend%20using%201.5x,t%20deduce%20your%20likely%20holdings.
-			Also see slumbot notes: https://nanopdf.com/queue/slumbot-nl-solving-large-games-with-counterfactual_pdf?queue_id=-1&x=1670505293&z=OTkuMjA5LjUyLjEzOA==
+		
 
-			For initial bets, these are fractions of the total pot size (money at the center of the table):
-			for bets:
-				- b0.25 = bet 25% of the pot 
-				- b0.5 = bet 50% of the pot
-				- b0.75 = bet 75% of the pot
-				- b1 = bet 100% of the pot
-				- b2 = ...
-				- b4 = ...
-				- b8 =
-				- all-in = all-in, opponent is forced to either call or fold
+			actions = ['k', 'c', 'f'] 
+			player = self.player() 
+			remaining_amount = self.get_remaining_balance(player)
+			min_bet = self.get_min_bet()
+			for bet_size in range(min_bet, remaining_amount + 1):
+				actions.append('b' + str(bet_size))
 
-			After a bet has happened, we can only raise by a certain amount.
-				- b0.5
-				- b1 
-				- b2 = 2x pot size
-				- b4 = 4x pot size
-				- b8 = 8x pot size
-				- all-in = all-in, opponent is forced to either call or fold
-			
-			2-bet is the last time we can raise again
-			- b1
-			- b2 = 2x pot size
-			- all-in
-			
-			3-bet
-			- b1
-			
-			4-bet
-			- all-in
-			
-			# TODO: Handle all-in case
-			
-			It's just so annoying because there are so many bet sizing edge cases to take care off.
-			
-			"""
-			actions = ['k', 'b0.25','b0.5', 'b0.75', 'b1', 'b2', 'b4', 'b8', 'all-in', 'c', 'f'] 
-			
 			current_game_stage_history, stage = self.get_current_game_stage_history()
-
 			# Pre-flop
 			if stage == 'preflop':
-			# Small blind to act
-				if len(current_game_stage_history) == 0: # call/bet
+				# Small blind to act
+				if len(current_game_stage_history) == 0: # Action on SB, who can either call, bet, or fold
 					actions.remove('k') # You cannot check
 					return actions
 
@@ -156,29 +135,88 @@ class HoldEmHistory(base.History):
 					else: # Other player has bet, so you cannot check
 						actions.remove('k')
 						return actions
-				elif len(current_game_stage_history) == 2: # 3-bet
-					# You cannot check at this point
-					actions = ['b1', 'all-in', 'c', 'f']
+				else:
+					actions.remove('check')
+				# elif len(current_game_stage_history) == 2: # 3-bet
+				# 	# You cannot check at this point
+				# 	actions = ['b1', 'all-in', 'c', 'f']
 					
-				elif len(current_game_stage_history) == 3: # 4-bet
-					actions = ['all-in', 'c', 'f'] 
+				# elif len(current_game_stage_history) == 3: # 4-bet
+				# 	actions = ['all-in', 'c', 'f'] 
 
 			else: # flop, turn, river
-				if len(current_game_stage_history == 0):
+				if len(current_game_stage_history) == 0:
 					actions.remove('f') # You cannot fold
 				elif len(current_game_stage_history) == 1:
 					if current_game_stage_history[0] == 'k':
 						actions.remove('f')
 					else: # Opponent has bet, so you cannot check
 						actions.remove('k')
+				else:
+					actions.remove('k') # Cannot check
 
 			return actions
 		else:
 			raise Exception("Cannot call actions on a terminal history")
 
-	
+	def get_min_bet(self):
+		# TODO: Test this function
+		curr_bet = 0
+		prev_bet = 0
+		for i in range(len(self.history)-1, 0, -1):
+			if self.history[i][0] == 'b': # Bet, might be a raise
+				if curr_bet == 0:
+					curr_bet = int(self.history[i][1:])
+				elif prev_bet == 0:
+					prev_bet = int(self.history[i][1:])
+			elif self.history[i] == '/':
+				break
+
+		# Handle case when game stage is preflop, in which case a bet is already placed for you
+		game_stage_history, game_stage = self.get_current_game_stage_history()
+		if game_stage == 'preflop' and curr_bet == 0:
+			curr_bet = 1 # big blind
+		elif curr_bet == 0: # No bets has been placed
+			assert(prev_bet == 0)
+			curr_bet = 0.5
+
+		return int(curr_bet + (curr_bet - prev_bet)) # This is the minimum raise
+
+
+	def calculate_player_total_up_to_game_stage(self, player: Player):
+		stage_i = 0
+		player_total = 0
+		player_game_stage_total = 0
+		i = 0
+		for hist_idx, hist in enumerate(self.history):
+			i = (i + 1) % 2
+			if i == player:
+				if hist[0] == 'b':
+					player_game_stage_total = int(hist[1:])
+				elif hist == 'k':
+					player_game_stage_total = 0
+				elif hist == 'c': # Call the previous bet
+					player_game_stage_total = int(self.history[hist_idx - 1][1:])
+
+			if hist == '/':
+				stage_i += 1
+				player_total += player_game_stage_total
+				player_game_stage_total = 0
+				if stage_i == 1:
+					i = (i + 1) % 2 # We need to flip the order post-flop, as the BB is the one who acts first now
+
+		return player_total
+		
+
+	def get_remaining_balance(self, player: Player):
+		"""
+		Calculate the remaining balance for the given player
+		"""
+		return 100 - self.calculate_player_total_up_to_game_stage(player)
+
 	def game_stage_ended(self):
-		current_game_stage_history = self.get_current_game_stage_history()
+		# TODO: Make sure this logic is good
+		current_game_stage_history, stage = self.get_current_game_stage_history()
 		if len(current_game_stage_history) == 0:
 			return False
 		elif current_game_stage_history[-1] == 'f':
@@ -189,9 +227,15 @@ class HoldEmHistory(base.History):
 			return True
 		else:
 			return False
-		
 
 	def player(self):
+		# TODO: check that this is correct
+		"""
+		This part is confusing for heads-up no limit poker, because the player that acts first changes:
+		The Small Blind (SB) acts first pre-flop, but the Big Blind (BB) acts first post-flop.
+		1. ['AkTh', 'QdKd', 'b2', 'c', '/', 'Qh', 'b2', 'c', '/', '2d', b2', 'f']
+							 SB	   BB		 	   BB	 SB 	   		BB 	 SB
+		"""
 		assert(not self.is_terminal())
 		# Chance nodes, we have to draw cards
 		if len(self.history) <= 1: 
@@ -205,7 +249,10 @@ class HoldEmHistory(base.History):
 			# Next action is drawing one of the community cards
 			return -1
 		else:
-			return len(self.history) % 2
+			if '/' in self.history:
+				return (len(self.history) + 1) % 2 # Order is flipped post-flop
+			else:
+				return len(self.history) % 2 
 	
 	def is_chance(self):
 		return super().is_chance()
@@ -291,7 +338,6 @@ class HoldEmHistory(base.History):
 		
 
 				
-
 	
 	def __add__(self, action: Action):
 		new_history = HoldEmHistory(self.history + [action])
@@ -310,11 +356,24 @@ class HoldEmHistory(base.History):
 			history = copy.deepcopy(self.history)
 			history[0] = '?' # Unknown card
 			return history
+			
+		# TODO: Replace with Card Abstraction
+		# TODO: Replace with Action Abstraction
+
 
 class HoldemInfoSet(base.InfoSet):
 	"""
 	Information Sets (InfoSets) cannot be chance histories, nor terminal histories.
 	This condition is checked when infosets are created.
+	
+	This infoset is an abstracted versions of the history in this case. 
+	See the `get_infoSet_key(self)` function for these
+	
+	There are 2 abstractions we are doing:
+		1. Card Abstraction (grouping together similar hands)
+		2. Action Abstraction
+	
+	I've imported my abstractions from `abstraction.py`.
 	
 	"""
 	def __init__(self, infoSet: List[Action]):
@@ -343,5 +402,24 @@ def create_history():
 	
 
 if __name__ == "__main__":
-	cfr = base.CFR(create_infoSet, create_history)
-	cfr.solve()
+	hist = create_history()
+	assert(hist.player() == -1)
+	hist1 = hist + 'AkTh'
+	assert(hist1.player() == -1)
+	hist2 = hist1 + 'QdKd'
+	assert(hist2.player() == 0)
+	hist3 = hist2 + 'b2'
+	assert(hist3.player() == 1)
+	hist4 = hist3 + 'c'
+	assert(hist4.player() == -1)
+	# Below are chance events, so it doesn't matter which player it is
+	hist5 = hist4 + '/'
+	assert(hist5.player() == -1)
+	hist6 = hist5 + 'Qh'
+	assert(hist6.player() == 1)
+	hist7 = hist6 + 'b1'
+	hist8 = hist7 + 'b3'
+	print(hist8.actions())
+
+	# cfr = base.CFR(create_infoSet, create_history)
+	# cfr.solve()

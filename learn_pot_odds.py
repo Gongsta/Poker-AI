@@ -2,6 +2,9 @@
 This is a fun python script where you can enter your cards and it can help you learn
 your pot odds. Built off the card abstraction algorithms in `hand_clustering.py`.
 """
+import sys
+sys.path.append('./src')
+
 from abstraction import calculate_equity, calculate_equity_distribution, calculate_face_up_equity, plot_equity_hist
 import fast_evaluator
 import argparse

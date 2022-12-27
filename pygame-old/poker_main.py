@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../src")
 from environment import *
 from helper import *
 import pygame 
@@ -9,7 +11,8 @@ import joblib
 pygame.font.init() # For fonts
 pygame.mixer.init() # For sounds
 
-WIDTH, HEIGHT = 900, 500
+SCALE = 1
+WIDTH, HEIGHT = 1300, 700
 
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Poker By Steven Gong")
@@ -251,6 +254,9 @@ def main():
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				run = False
+			# elif event.type == pygame.VIDEORESIZE: # For resizing of the window
+			# 	global WIN
+			# 	WIN = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 				
 			# Check if the buttons are clicked, only process if it is our turn
 			if user_input:

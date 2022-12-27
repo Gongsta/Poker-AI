@@ -31,20 +31,103 @@ BET ABSTRACTION
 """
 # For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. 
 
-def bet_abstraction(bet_size):
-	"""Bet size is relative to pot.
+# def bet_abstraction(bet_size):
+# 	"""Bet size is relative to pot.
 	
-	"""
-	if bet_size == 0:
-		return 'c'
-	elif bet_size <= 0.5:
-		return 0.5
-	elif bet_size <= 1.0:
-		return 1.0
-	elif bet_size <= 2.0:
-		return 2.0
-	else:
-		return 'all-in'
+# 	"""
+# 	if bet_size == 0:
+# 		return 'c'
+# 	elif bet_size <= 0.5:
+# 		return 0.5
+# 	elif bet_size <= 1.0:
+# 		return 1.0
+# 	elif bet_size <= 2.0:
+# 		return 2.0
+# 	else:
+# 		return 'all-in'
+
+# def abstraction():
+# 			# TODO: Investigate the effect of action abstraction on exploitability.
+# 			"""
+			
+# 			Daniel Negreanu: How Much Should You Raise? https://www.youtube.com/watch?v=WqRUyYQcc5U
+# 			Bet sizing: https://www.consciouspoker.com/blog/poker-bet-sizing-strategy/#:~:text=We%20recommend%20using%201.5x,t%20deduce%20your%20likely%20holdings.
+# 			Also see slumbot notes: https://nanopdf.com/queue/slumbot-nl-solving-large-games-with-counterfactual_pdf?queue_id=-1&x=1670505293&z=OTkuMjA5LjUyLjEzOA==
+			
+# 			TODO: Check the case on preflop when the small blind simply calls, the BB should have the option to min-raise by amounts.
+
+
+# 			For initial bets, these are fractions of the total pot size (money at the center of the table):
+# 			for bets:
+# 				- b0.25 = bet 25% of the pot 
+# 				- b0.5 = bet 50% of the pot
+# 				- b0.75 = bet 75% of the pot
+# 				- b1 = bet 100% of the pot
+# 				- b2 = ...
+# 				- b4 = ...
+# 				- b8 =
+# 				- all-in = all-in, opponent is forced to either call or fold
+
+# 			After a bet has happened, we can only raise by a certain amount.
+# 				- b0.5
+# 				- b1 
+# 				- b2 = 2x pot size
+# 				- b4 = 4x pot size
+# 				- b8 = 8x pot size
+# 				- all-in = all-in, opponent is forced to either call or fold
+			
+# 			2-bet is the last time we can raise again
+# 			- b1
+# 			- b2 = 2x pot size
+# 			- all-in
+			
+# 			3-bet
+# 			- b1
+			
+# 			4-bet
+# 			- all-in
+# 			"""
+			
+# 			# Note: all-in case is just the maximum bet
+
+# 		actions = ['k', 'b0.25','b0.5', 'b0.75', 'b1', 'b2', 'b4', 'b8', 'all-in', 'c', 'f'] 
+		
+# 		current_game_stage_history, stage = self.get_current_game_stage_history()
+
+# 		# Pre-flop
+# 		if stage == 'preflop':
+# 		# Small blind to act
+# 			if len(current_game_stage_history) == 0: # call/bet
+# 				actions.remove('k') # You cannot check
+# 				return actions
+
+# 			# big blind to act
+# 			elif len(current_game_stage_history) == 1: # 2-bet
+# 				if (current_game_stage_history[0] == 'c'): # Small blind called, you don't need to fold
+# 					actions.remove('f')
+# 					return actions
+# 				else: # Other player has bet, so you cannot check
+# 					actions.remove('k')
+# 					return actions
+# 			elif len(current_game_stage_history) == 2: # 3-bet
+# 				# You cannot check at this point
+# 				actions = ['b1', 'all-in', 'c', 'f']
+				
+# 			elif len(current_game_stage_history) == 3: # 4-bet
+# 				actions = ['all-in', 'c', 'f'] 
+
+# 		else: # flop, turn, river
+# 			if len(current_game_stage_history == 0):
+# 				actions.remove('f') # You cannot fold
+# 			elif len(current_game_stage_history) == 1:
+# 				if current_game_stage_history[0] == 'k':
+# 					actions.remove('f')
+# 				else: # Opponent has bet, so you cannot check
+# 					actions.remove('k')
+
+# 		return actions
+# 	else:
+# 		raise Exception("Cannot call actions on a terminal history")
 
 
 """

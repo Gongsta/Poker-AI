@@ -15,6 +15,9 @@ This repository requires Python>=3.9.
 pip install -r requirements.txt
 ```
 
+Originally did the game in PyGame, but it's not responsive so I don't really like that. I plan on moving it to flask.
+
+
 ### Basic Explanations of the Game + Class Definitions
 Poker is a family of comparing card games in which players wager over which hand is best according to that specific game's rules in ways similar to these rankings. The goal of the game is to win as much money as possible. Unlike other games like Blackjack where players work together and try to beat the "house" (i.e. the casino), Poker is a game in which players try to beat each other.
 
@@ -98,13 +101,15 @@ How to evaluate the performance of the Poker AI? There are 3 main ways to measur
 - [x] Implement Deep CFR for Kuhn Poker
 
 ##### 3. Implement the AI for No Limit Texas Hold-Em
-- [ ] Implement abstraction, generate a table for pre-flop using Monte-Carlo technique, same card representation should have exactly the same EHS
-- [ ] Calculate pot odds at different stages of the game (use this as a helper when people actually play the game)
-- [ ] Implement card abstraction to reduce the game size from $10^{161}$ to $10^{12}$ decision points 
-	- [ ] Implement basic monte-carlo method to calculate the EHS of a pair of cards at different stages of the game. This assumes a random uniform draw of opponent hands and random uniform rollout of public cards
-	- [ ] Implement a simple clustering algorithm that uses these EHS to cluster various cards / scenarios together...?
+- [x] Implement abstraction, generate a table for pre-flop using Monte-Carlo technique, same card representation should have exactly the same EHS
+- [x] Calculate pot odds at different stages of the game (use this as a helper when people actually play the game)
+- [x] Implement card abstraction to reduce the game size from $10^{161}$ to $10^{12}$ decision points 
+	- [x] Implement basic monte-carlo method to calculate the EHS of a pair of cards at different stages of the game. This assumes a random uniform draw of opponent hands and random uniform rollout of public cards
+	- [x] Implement a simple clustering algorithm that uses these EHS to cluster various cards / scenarios together...?
 	- [ x ] Implement parallel methods with `joblib` to accelerate speed: Went from ~0.17s per hand to ~0.05s per hand
 	- Use 169, 5000, 5000, 5000 buckets as outlined here: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
+		- Hmm maybe this is too much
+- [ ] Implement helper functions to calculate expected values of various strategies (utilities of a strategy profile)
 - [ ] Implement Monte-Carlo CFR
 - [ ] Implement a distributed version of Monte-Carlo CFR
 - [ ] Implement sub-game solving to come up with better strategies during the actual game (key idea presented by Noam Brown. Seach during the game drastically improves performance)... I don't know how to do this

@@ -58,6 +58,7 @@ class AIPlayer(Player):
 		return self.current_bet
 
 class PokerEnvironment():
+	# TODO: Change logic so the raising rules is done properly, see `holdem.py`
 	def __init__(self) -> None:
 		self.players: List[Player] = []
 		self.deck = Deck() 

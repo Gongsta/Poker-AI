@@ -1,3 +1,5 @@
+# Src
+This folder holds the main code for the ai logic.
 Design decisions I am trying to make:
 
 - Should I call it node or state?  
