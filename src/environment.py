@@ -27,7 +27,7 @@ class Player(): # This is the POV
 	# 	self.observed_env = env
 
 	def place_bet(self, action: str, observed_env) -> int:
-		# TODO: This logic is bad
+		# TODO: This logic is bad,
 		if action == "r":
 			self.set_current_bet(max(2*observed_env.min_bet_size, observed_env.big_blind))
 		
@@ -90,6 +90,7 @@ class PokerEnvironment():
 		self.new_player_balance = 10000
 		self.small_blind = 50 
 		self.big_blind = 100 # TODO: Check if this is even necessary 
+		self.history = "" # THis will be the history that will be fed into the AI
 		
 		self.multi_binary_representation = [] # TODO: this is used for the RL part, to make updating the hands a bit easier
 		
