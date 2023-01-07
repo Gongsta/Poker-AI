@@ -1,6 +1,6 @@
 """
 This is a fun python script where you can enter your cards and it can help you learn
-your pot odds. Built off the card abstraction algorithms in `hand_clustering.py`.
+your pot odds. Built off the monte carlo algorithms in `abstraction.py` to calculate values of hands.
 """
 import sys
 sys.path.append('./src')
@@ -69,6 +69,7 @@ if __name__ == "__main__":
 				community_cards.append(river_card)
 			equity = calculate_equity(player_cards, community_cards, n=10000) # We want this to be really accurate
 			print("River Equity: {:.2f}%".format(equity * 100))
+
 			# if len(opponent_cards) == 2:
 			# 	player_probability, opponent_probability = calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10000)
 			# 	print("\nAssuming you know your opponent's cards, You have a {:.2f}% equity".format(player_probability * 100))

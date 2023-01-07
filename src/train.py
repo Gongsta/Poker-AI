@@ -71,8 +71,6 @@ class History():
 		self.game_stage = 2
 		self.curr_round_plays = 0 # if self.curr_round_plays == 0 and we check, then we DON'T move to the next game stage
 
-	
-
 all_history = [] # Global variable to store all histories
 def cfr(all_community_cards: List[Card], private_cards: List[CombinedHand], community_cards: CombinedHand,  history: History, p0, p1):
 	"""

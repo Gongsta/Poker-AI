@@ -57,9 +57,10 @@ CARD_BACK = pygame.transform.scale(pygame.image.load("../assets/back.png"), (263
 
 
 POT_FONT = pygame.font.SysFont('Roboto', 30)
-BET_BUTTON_FONT = pygame.font.SysFont('Roboto', 30)
+BET_BUTTON_FONT = pygame.font.SysFont('Roboto', 24)
 BET_FONT = pygame.font.SysFont('Roboto', 26)
 PLAYERS_FONT = pygame.font.SysFont('Roboto', 24)
+
 
 # To rescale: pygame.transform.scale(card, (width, height))
 # pygame.transform.rotate(card, degrees)
@@ -72,20 +73,21 @@ PLAYERS_FONT = pygame.font.SysFont('Roboto', 24)
 # checking for collisions, use colliderectd
 
 # BUTTONS
-fold_rect = pygame.Rect(550, HEIGHT-80, 90,45) 
-check_rect = pygame.Rect(655, HEIGHT-80, 90,45) # Can also be call button
-half_pot_rect = pygame.Rect(760, HEIGHT-80, 130,45)
-pot_rect = pygame.Rect(905, HEIGHT-80, 70,45)
-custom_rect = pygame.Rect(990, HEIGHT-80, 80,45)
-buttons = [fold_rect, check_rect, half_pot_rect, pot_rect, custom_rect]
+fold_rect = pygame.Rect(800, HEIGHT-80, 80,45) 
+check_rect = pygame.Rect(887, HEIGHT-80, 100,45) # Can also be call button
+custom_rect = pygame.Rect(995, HEIGHT-80, 80,45)
+buttons = [fold_rect, check_rect, custom_rect]
 
 input_box = pygame.Rect(1060, HEIGHT-80, 140, 45)
 color_inactive = pygame.Color('lightskyblue3')
 color_active = pygame.Color('dodgerblue2')
 color = color_inactive
 active = False
-bet_text = ''
+input_bet_text = ''
+warning_text = ''
 done = False
+
+cursor_counter = 0
 
 def load_card_image(card: Card):
 	# 263 × 376
@@ -114,6 +116,14 @@ def display_user_bet(env: PokerEnvironment):
 def display_opponent_bet(env: PokerEnvironment):
 	pot_information = BET_FONT.render("Bet: $" + str(env.players[1].current_bet), 1, WHITE)
 	WIN.blit(pot_information, (WIDTH/2- 30, 190))
+
+def display_sessions_winnings(env: PokerEnvironment):
+	winnings = sum(env.players_balance_history[0])
+	if winnings < 0:
+		text = POT_FONT.render("Session Winnings: -$"+ str(-winnings), 1, WHITE)
+	else:
+		text = POT_FONT.render("Session Winnings: $"+ str(winnings), 1, WHITE)
+	WIN.blit(text, (70, 40))
 
 def display_user_cards(env: PokerEnvironment):
 	WIN.blit(load_card_image(env.players[0].hand[0]),PLAYER_CARD_1)
@@ -148,6 +158,7 @@ def display_dealer_button(env: PokerEnvironment):
 	else: # Opponent is the dealer
 		WIN.blit(dealer_button, (515, 120))
 
+
 def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 
 	WIN.blit(POKER_BACKGROUND, (0,0))
@@ -177,6 +188,9 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 	# Display Player Balance Information
 	display_user_balance(env)
 	display_opponent_balance(env)
+	
+	# Display Session Winnings
+	display_sessions_winnings(env)
 
 	# if env.showdown and env.end_of_round(): # Show who won
 	if env.end_of_round():
@@ -191,35 +205,37 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 		WIN.blit(text, (250, 350))
 
 	# Pressable Buttons for Check / Fold / Raise. Only display buttons if it is your turn
+	warning_text_rendered = BET_FONT.render(warning_text, 1, RED)
+	WIN.blit(warning_text_rendered, (WIDTH - 250, HEIGHT -120))
+
 	if user_input:
 		if env.position_in_play == 0:
 			# AAfilledRoundedRect(WIN, RED, pygame.Rect(392,400, 120,50), radius=0.4)
-			AAfilledRoundedRect(WIN, RED, fold_rect, radius=0.4)
 			AAfilledRoundedRect(WIN, RED, check_rect, radius=0.4)
-			AAfilledRoundedRect(WIN, RED, half_pot_rect, radius=0.4)
-			AAfilledRoundedRect(WIN, RED, pot_rect, radius=0.4)
 			AAfilledRoundedRect(WIN, RED, custom_rect, radius=0.4)
 			AAfilledRoundedRect(WIN, WHITE, input_box, radius=0.4)
 
-			fold_bet = BET_BUTTON_FONT.render("Fold", 1, WHITE)
-			WIN.blit(fold_bet, (fold_rect.x+5, fold_rect.y+5))
+			if 'f' in env.history.actions():
+				AAfilledRoundedRect(WIN, RED, fold_rect, radius=0.4)
+				fold_bet = BET_BUTTON_FONT.render("Fold", 1, WHITE)
+				WIN.blit(fold_bet, (fold_rect.x+15, fold_rect.y+7))
 
-			if env.min_bet_size == 0:
+			if 'k' in env.history.actions():
 				check_bet = BET_BUTTON_FONT.render("Check", 1, WHITE) 
-				WIN.blit(check_bet, (check_rect.x+5, check_rect.y+5))
-			else:
+				WIN.blit(check_bet, (check_rect.x+15, check_rect.y+7))
+			else: # TODO: Min bet size is not 0 when you are the small blind, so it should be call, not check right.
+				# I forgot how the logic is handled for the preflop betting sizes
 				call_bet = BET_BUTTON_FONT.render("Call", 1, WHITE) 
-				WIN.blit(call_bet, (check_rect.x+5, check_rect.y+5))
+				WIN.blit(call_bet, (check_rect.x+28, check_rect.y+7))
 
 			# TODO: Handle edges cases where these buttons are impossible, in which case you need to grey it out
-			half_pot_bet = BET_BUTTON_FONT.render("Half Pot", 1, WHITE)
-			WIN.blit(half_pot_bet, (half_pot_rect.x+5, half_pot_rect.y+5))
-			pot_bet = BET_BUTTON_FONT.render("Pot", 1, WHITE)
-			WIN.blit(pot_bet, (pot_rect.x+5, pot_rect.y+5))
 			custom_bet = BET_BUTTON_FONT.render("Bet", 1, WHITE)
-			WIN.blit(custom_bet, (custom_rect.x+5, custom_rect.y+5))
-			custom_bet_text = BET_BUTTON_FONT.render(bet_text, 1, BLACK)
-			WIN.blit(custom_bet_text, (input_box.x+5, input_box.y+5))
+			WIN.blit(custom_bet, (custom_rect.x+15, custom_rect.y+7))
+			custom_input_bet_text = BET_BUTTON_FONT.render(input_bet_text, 1, BLACK)
+			WIN.blit(custom_input_bet_text, (input_box.x+7, input_box.y+7))
+	
+	if cursor_counter < 15 and active:
+		pygame.draw.rect(WIN, (0, 0, 0), (WIDTH - 210 + 13 * len(input_bet_text) , HEIGHT - 70, 1, 20), 1)
 
 	pygame.display.update()
 
@@ -228,7 +244,7 @@ def main():
 	# Load the nodeMap
 	parser = argparse.ArgumentParser(description="Play Hold'Em Poker against the best AI possible.")
 	parser.add_argument("-p", "--play",
-					action="store_true", dest="user_input", default=False,
+					action="store_true", dest="user_input", default=True,
 					help="Manually play against the AI through a PyGame interface.")
 	parser.add_argument("-r", "--replay",
 					action="store_true", dest="replay", default=False,
@@ -247,7 +263,7 @@ def main():
 		game = 0
 		game_i = 0
 	
-	env = PokerEnvironment()
+	env: PokerEnvironment = PokerEnvironment()
 	if user_input or replay:
 		env.add_player() # You / replay
 	else:
@@ -263,11 +279,14 @@ def main():
 	
 
 	while run:
+		global input_bet_text, active, cursor_counter, warning_text
+		cursor_counter = (cursor_counter + 1) % 30
+
 		if user_input or replay: # If you want to render PyGame
 			clock.tick(FPS)
 		
 		handler_called = False
-			
+		
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				run = False
@@ -276,18 +295,28 @@ def main():
 			# 	WIN = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 				
 			# Check if the buttons are clicked, only process if it is our turn
-			global bet_text, active
 			if user_input:
 				if event.type == pygame.MOUSEBUTTONDOWN and env.position_in_play == 0:
-					for i in range(3): # Check for willision with the three buttons
+					for i in range(len(buttons)): # Check for willision with the three buttons
 						if buttons[i].collidepoint(pygame.mouse.get_pos()):
+							warning_text = ''
 							# TODO: Change this for no-limit version
 							if i == 0:
 								env.handle_game_stage("f") # Fold
 							elif i == 1:
-								env.handle_game_stage("c") # Check / Call
-							else:
-								env.handle_game_stage("r") # Raise
+								if 'k' in env.history.actions():
+									env.handle_game_stage("k") # Check
+								else:
+									env.handle_game_stage("c") # Call
+							elif i == 2:
+								if input_bet_text != '':
+									bet = "b" + input_bet_text
+									if bet in env.history.actions():
+										env.handle_game_stage(bet)
+										input_bet_text = ''
+									else:
+										warning_text = "Invalid bet size"
+
 							
 							handler_called = True
 							break
@@ -303,12 +332,11 @@ def main():
 				if event.type == pygame.KEYDOWN:
 					if active:
 						if event.key == pygame.K_RETURN:
-							print(bet_text)
-							bet_text = ''
+							input_bet_text = ''
 						elif event.key == pygame.K_BACKSPACE:
-							bet_text = bet_text[:-1]
+							input_bet_text = input_bet_text[:-1]
 						else:
-							bet_text += event.unicode
+							input_bet_text += event.unicode
 		
 		if not handler_called:
 			if replay:
@@ -337,11 +365,9 @@ def main():
 			draw_window(env, god_mode, user_input)
 
 		if user_input and env.end_of_round():
+			draw_window(env, god_mode, False)
 			time.sleep(2)
 		
-		# if user_input:
-		# 	time.sleep(0.2)
-
 
 	pygame.quit()
 

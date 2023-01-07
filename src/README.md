@@ -16,3 +16,9 @@ from the perspective of the opponent?
 
 I am very hesitant about implementing the algortihm with OOP because it tends to be slower. Actually, I just ran an experiment
 inside testing/misc_performance.py and it turns out that OOP is faster...?
+
+### Getting Started
+Generate the abstractions needed for the game. See `abstraction.py` for the different flags you can pass.
+```python
+python3 abstraction.py
+```

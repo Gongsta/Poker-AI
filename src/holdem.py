@@ -8,12 +8,11 @@ from fast_evaluator import Deck
 
 deck = Deck()
 
-
 class HoldEmHistory(base.History):
 	"""
 	Example of history: 
 	First two actions are the cards dealt to the players. The rest of the actions are the actions taken by the players.
-		1. ['AkTh', 'QdKd', 'b2', 'c', '/', 'Qh', 'b2', 'c', '/', 'k', 'k']
+		1. ['AkTh', 'QdKd', 'b2', 'c', '/', 'QhJdKs', 'b2', 'c', '/', 'k', 'k']
 	
 	Actions
 	k = check
@@ -63,17 +62,28 @@ class HoldEmHistory(base.History):
 	def get_current_cards(self):
 		current_cards = []
 		new_stage = False
+		stage_i = 0
 		for i, action in enumerate(self.history):
 			if new_stage:
 				new_stage = False
-				current_cards.append(action) # Community card
+				if stage_i == 1: # Flop, so there are 3 community cards
+					assert(len(action) == 6)
+					current_cards.append(action[:2]) # Community card 1
+					current_cards.append(action[2:4]) # Community card 2
+					current_cards.append(action[4:6]) # Community card 3
+
+				else: # Turn or river
+					current_cards.append(action) # Community card
 			elif action == '/':
 				new_stage = True
+				stage_i += 1
 			
 			elif i == 0 or i == 1:
 				assert(len(action) == 4)
 				current_cards.append(action[:2]) # Private card 1
 				current_cards.append(action[2:4]) # Private card 2
+
+		return current_cards
 
 	def get_current_game_stage_history(self):
 		"""
@@ -110,20 +120,19 @@ class HoldEmHistory(base.History):
 			I.e. if I bet, you raise, I raise, you raise, then I must either call, fold, or all-in. Else the branching factor is going to be insane.
 			"""
 
-		
-
 			actions = ['k', 'c', 'f'] 
 			player = self.player() 
 			remaining_amount = self.get_remaining_balance(player)
 			min_bet = self.get_min_bet()
-			for bet_size in range(min_bet, remaining_amount + 1):
+
+			for bet_size in range(min_bet, remaining_amount + 1): # These define the legal actions of the game
 				actions.append('b' + str(bet_size))
 
 			current_game_stage_history, stage = self.get_current_game_stage_history()
 			# Pre-flop
 			if stage == 'preflop':
 				# Small blind to act
-				if len(current_game_stage_history) == 0: # Action on SB, who can either call, bet, or fold
+				if len(current_game_stage_history) == 0: # Action on SB (Dealer), who can either call, bet, or fold
 					actions.remove('k') # You cannot check
 					return actions
 
@@ -136,7 +145,8 @@ class HoldEmHistory(base.History):
 						actions.remove('k')
 						return actions
 				else:
-					actions.remove('check')
+					actions.remove('k')
+
 				# elif len(current_game_stage_history) == 2: # 3-bet
 				# 	# You cannot check at this point
 				# 	actions = ['b1', 'all-in', 'c', 'f']
@@ -175,18 +185,18 @@ class HoldEmHistory(base.History):
 		# Handle case when game stage is preflop, in which case a bet is already placed for you
 		game_stage_history, game_stage = self.get_current_game_stage_history()
 		if game_stage == 'preflop' and curr_bet == 0:
-			curr_bet = 1 # big blind
+			curr_bet = 2 # big blind
 		elif curr_bet == 0: # No bets has been placed
 			assert(prev_bet == 0)
-			curr_bet = 0.5
+			curr_bet = 1
 
 		return int(curr_bet + (curr_bet - prev_bet)) # This is the minimum raise
 
 
 	def calculate_player_total_up_to_game_stage(self, player: Player):
 		stage_i = 0
-		player_total = 0
-		player_game_stage_total = 0
+		player_total = 0 # Total across all game stages (preflop, flop, turn, river)
+		player_game_stage_total = 0 # Total for a given game stage
 		i = 0
 		for hist_idx, hist in enumerate(self.history):
 			i = (i + 1) % 2
@@ -194,9 +204,16 @@ class HoldEmHistory(base.History):
 				if hist[0] == 'b':
 					player_game_stage_total = int(hist[1:])
 				elif hist == 'k':
-					player_game_stage_total = 0
+					if stage_i == 0: # preflop, checking means 2
+						player_game_stage_total = 2
+					else:
+						player_game_stage_total = 0
 				elif hist == 'c': # Call the previous bet
-					player_game_stage_total = int(self.history[hist_idx - 1][1:])
+					# Exception for when you can call the big blind on the preflop, without the big blind having bet previously
+					if hist_idx == 2:
+						player_game_stage_total = 2
+					else:
+						player_game_stage_total = int(self.history[hist_idx - 1][1:])
 
 			if hist == '/':
 				stage_i += 1
@@ -211,6 +228,8 @@ class HoldEmHistory(base.History):
 	def get_remaining_balance(self, player: Player):
 		"""
 		Calculate the remaining balance for the given player
+		
+		Each player has a balance of 100
 		"""
 		return 100 - self.calculate_player_total_up_to_game_stage(player)
 
@@ -236,7 +255,6 @@ class HoldEmHistory(base.History):
 		1. ['AkTh', 'QdKd', 'b2', 'c', '/', 'Qh', 'b2', 'c', '/', '2d', b2', 'f']
 							 SB	   BB		 	   BB	 SB 	   		BB 	 SB
 		"""
-		assert(not self.is_terminal())
 		# Chance nodes, we have to draw cards
 		if len(self.history) <= 1: 
 			return -1
@@ -336,7 +354,6 @@ class HoldEmHistory(base.History):
 
 		# Now that we know how much we won from the pot, we also we to calculate how much we made ourselves
 		
-
 				
 	
 	def __add__(self, action: Action):
@@ -400,7 +417,6 @@ def create_infoSet(infoSet_key: List[Action]):
 def create_history():
 	return HoldEmHistory()
 	
-
 if __name__ == "__main__":
 	hist = create_history()
 	assert(hist.player() == -1)

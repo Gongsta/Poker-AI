@@ -15,7 +15,7 @@ Lif of animations I need to make:
 # config.background_color = "#151213" # Dark brown Gray
 # config.background_color = "#262627" # Gray
 # config.background_color = "#121212" # Dark Gray
-config.background_color = WHITE
+config.background_color = PURE_GREEN
 Text.set_default(font='Shadows Into Light', color=BLACK)
 
 class NashEquilibriumText(Scene):
@@ -50,9 +50,12 @@ def create_mobject(choice):
 
 class RPS(Scene):
     def construct(self):
-        rock = create_mobject('rock').shift(3*LEFT)
+        background = ImageMobject('assets/background.png').scale(0.4)
+        self.add(background)
+
+        rock = create_mobject('rock').shift(4.5*LEFT)
         paper = create_mobject('paper')
-        scissors = create_mobject('scissors').shift(3*RIGHT)
+        scissors = create_mobject('scissors').shift(4.5*RIGHT)
         
         self.play(FadeIn(rock, scale=0.5), FadeIn(paper, scale=0.5), FadeIn(scissors, scale=0.5))
         # self.play(ReplacementTransform(rText, rock), ReplacementTransform(pText, paper), ReplacementTransform(sText, scissors))
@@ -66,24 +69,32 @@ class RPS(Scene):
         highlight = ImageMobject('assets/emphasize.png').scale(0.6).stretch(0.92, 1).shift(0.2*UP).stretch(0.9, 0).scale(0)
         self.play(AnimationGroup(Create(arrow), FadeIn(highlight), lag_ratio=0.5))
         group = Group(opponentText, arrow, highlight)
-        self.play(group.animate.shift(3*RIGHT))
+        self.play(group.animate.shift(4.5*RIGHT))
         self.wait(0.3)
-        rock2 = ImageMobject('assets/question.png').scale(0.5).shift(3*LEFT).shift(0.5*DOWN)
+        rock2 = ImageMobject('assets/question.png').scale(0.5).shift(4.5*LEFT).shift(0.5*DOWN)
         paper2 = ImageMobject('assets/question.png').scale(0.5).shift(0.5*DOWN)
-        scissors2 = ImageMobject('assets/question.png').scale(0.5).shift(3*RIGHT).shift(0.5*DOWN)
-        self.play(FadeIn(rock2), FadeIn(paper2), FadeIn(scissors2), group.animate.shift(6*LEFT), FadeOut(scissors), FadeOut(paper), FadeOut(rock))
+        scissors2 = ImageMobject('assets/question.png').scale(0.5).shift(4.5*RIGHT).shift(0.5*DOWN)
+        self.play(FadeIn(rock2), FadeIn(paper2), FadeIn(scissors2), group.animate.shift(9*LEFT), FadeOut(scissors), FadeOut(paper), FadeOut(rock))
         self.wait(0.3)
-        self.play(group.animate.shift(3*RIGHT))
+        self.play(group.animate.shift(4.5*RIGHT))
         self.wait(0.3)
-        self.play(group.animate.shift(3*LEFT))
+        self.play(group.animate.shift(4.5*LEFT))
         self.wait(0.3)
-        self.play(group.animate.shift(6*RIGHT))
+        self.play(group.animate.shift(9*RIGHT))
         self.wait(0.8)
-        self.play(FadeOut(*self.mobjects))
+
+        to_remove = []
+        for obj in self.mobjects:
+            if obj != background:
+                to_remove.append(obj)
+        self.play(FadeOut(*to_remove))
 
         
 class RPS2(Scene):
     def construct(self):
+        background = ImageMobject('assets/background.png').scale(0.4)
+        self.add(background)
+
         rock = create_mobject('rock').shift(4*LEFT + 2*UP)
         paper = create_mobject('paper').shift(2*UP)
         scissors = create_mobject('scissors').shift(4*RIGHT + 2*UP)
@@ -115,8 +126,8 @@ class RPS2(Scene):
 
 
 
-config.background_color = GRAY_BROWN
-Text.set_default(font='Shadows Into Light', color=WHITE)
+# config.background_color = GRAY_BROWN
+# Text.set_default(font='Shadows Into Light', color=WHITE)
 
 class RPSSim(Scene):
     """

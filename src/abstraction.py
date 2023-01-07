@@ -296,7 +296,6 @@ def kmeans_custom(
 	return choice_cluster.cpu(), initial_state.cpu() # clusters_indices_on_initial data, final_centroids
 
 
-
 def kmeans_custom_predict(
 		X,
 		centroids,
@@ -596,10 +595,10 @@ def generate_preflop_clusters(): # Lossless abstraction for pre-flop, 169 cluste
 	return preflop_clusters
 
 def create_abstraction_folders():
-	if not os.path.exists('data'):
+	if not os.path.exists('../data'):
 		for split in ['clusters', 'raw']:
 			for stage in ['flop', 'turn', 'river']:
-				os.makedirs(f'data/{split}/{stage}')
+				os.makedirs(f'../data/{split}/{stage}')
 
 
 def generate_postflop_equity_distributions(n_samples, bins,stage=None, save=True, timer=True): # Lossful abstraction for flop, turn and river
@@ -640,9 +639,9 @@ def generate_postflop_equity_distributions(n_samples, bins,stage=None, save=True
 		create_abstraction_folders()
 		file_id = int(time.time()) # Use the time as the file_id
 		# TODO: Change to joblib saving for consistency everywhere
-		with open(f'data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy', 'wb') as f:
+		with open(f'../data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy', 'wb') as f:
 			np.save(f, equity_distributions)
-		joblib.dump(hands, f'data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
+		joblib.dump(hands, f'../data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}')  # Store the list of hands, so you can associate a particular distribution with a particular hand
 	
 	
 
@@ -702,20 +701,20 @@ if __name__ == "__main__":
 		generate_postflop_equity_distributions(n_samples, bins, stage)
 	
 	if clustering:
-		raw_dataset_filenames = sorted(get_filenames(f'data/raw/{stage}'))
+		raw_dataset_filenames = sorted(get_filenames(f'../data/raw/{stage}'))
 		filename = raw_dataset_filenames[-1] # Take the most recently generated dataset to run our clustering on
 		
-		equity_distributions = np.load(f'data/raw/{stage}/{filename}') # TODO: Switch to joblib
+		equity_distributions = np.load(f'../data/raw/{stage}/{filename}') # TODO: Switch to joblib
 		print(filename)
-		if not os.path.exists(f'data/clusters/{stage}/{filename}'):
+		if not os.path.exists(f'../data/clusters/{stage}/{filename}'):
 			print(f"Generating the cluster for the {stage}")
 			print(filename)
 			kmeans = KMeans(100) # 100 Clusters seems good using the Elbow Method, see notebook/abstraction_exploration.ipynb
 			kmeans.fit(equity_distributions) # Perform Clustering
 			centroids = kmeans.cluster_centers_
-			joblib.dump(centroids, f'data/clusters/{stage}/{filename}')
+			joblib.dump(centroids, f'../data/clusters/{stage}/{filename}')
 		else: # Centroids have already been generated, just load them, which are tensors
-			centroids = joblib.load(f'data/clusters/{stage}/{filename}')
+			centroids = joblib.load(f'../data/clusters/{stage}/{filename}')
 			# Load KMeans Model
 			kmeans = KMeans(100)
 			kmeans.cluster_centers_ = centroids
