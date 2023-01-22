@@ -276,6 +276,18 @@ def main():
 
 	clock = pygame.time.Clock()
 	run = True
+
+	def place_custom_bet():
+		global input_bet_text, warning_text
+		if input_bet_text != '':
+			bet = "b" + input_bet_text
+			print(bet)
+			if bet in env.history.actions():
+				env.handle_game_stage(bet)
+				input_bet_text = ''
+				warning_text = ''
+			else:
+				warning_text = "Invalid bet size"
 	
 
 	while run:
@@ -309,13 +321,7 @@ def main():
 								else:
 									env.handle_game_stage("c") # Call
 							elif i == 2:
-								if input_bet_text != '':
-									bet = "b" + input_bet_text
-									if bet in env.history.actions():
-										env.handle_game_stage(bet)
-										input_bet_text = ''
-									else:
-										warning_text = "Invalid bet size"
+								place_custom_bet()
 
 							
 							handler_called = True
@@ -332,7 +338,8 @@ def main():
 				if event.type == pygame.KEYDOWN:
 					if active:
 						if event.key == pygame.K_RETURN:
-							input_bet_text = ''
+							place_custom_bet()
+
 						elif event.key == pygame.K_BACKSPACE:
 							input_bet_text = input_bet_text[:-1]
 						else:

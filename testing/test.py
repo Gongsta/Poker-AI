@@ -1,21 +1,22 @@
 import unittest
 import os
 import sys
-import shutil
 import treys
 from tqdm import tqdm
 
 
 if __name__ == "__main__":
-	devpath = os.path.relpath(os.path.join('..'), start=os.path.dirname(__file__))
-	sys.path = [devpath] + sys.path
+	sys.path.append("../src")
 
 # Import Libraries
 from environment import *
 from evaluator import *
+from abstraction import *
 
-class UnitTests(unittest.TestCase):
-	
+
+
+
+class CustomCardUnitTests(unittest.TestCase):
 	# Unit Testing
 	def test_card_initialization(self):
 		jackOfHearts = Card("JH")

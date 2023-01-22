@@ -92,22 +92,30 @@ class History:
 	
 	
 class InfoSet:
-	def __init__(self, infoSet: List[Action]):
+	"""
+	Most of the infoset information (actions, player) should be inherited from the history class.
+	
+	"""
+	def __init__(self, infoSet: List[Action], actions: List[Action], player: Player):
 		self.infoSet = infoSet
+		self.__actions = actions
+		self.__player = player
+
 		self.regret = {a: 0 for a in self.actions()}
 		self.strategy = {a: 0 for a in self.actions()}
 		self.cumulative_strategy = {a: 0 for a in self.actions()}
 		self.get_strategy()
-		assert(sum(self.strategy.values()) == 1.0)
+		assert(1.0 - sum(self.strategy.values()) < 1e-6)
+
 
 	def __repr__(self) -> str:
 		return str(self.infoSet)
 
 	def actions(self) -> List[Action]:
-		raise NotImplementedError()
+		return self.__actions
 	
 	def player(self) -> Player:
-		raise NotImplementedError()
+		return self.__player
 
 	def to_dict(self):
 		return {
@@ -154,11 +162,15 @@ class CFR:
 	
 	def get_infoSet(self, history: History) -> InfoSet:
 		infoSet_key = history.get_infoSet_key()
+		actions = history.actions()
+		player = history.player()
+
 		assert(type(infoSet_key) == list)
+		assert(type(actions) == list)
 
 		infoSet_key_str = ''.join(infoSet_key)
 		if infoSet_key_str not in self.infoSets:
-			self.infoSets[infoSet_key_str] = self.create_infoSet(infoSet_key)
+			self.infoSets[infoSet_key_str] = self.create_infoSet(infoSet_key, actions, player)
 
 		return self.infoSets[infoSet_key_str]
 
@@ -323,7 +335,7 @@ class CFR:
 		
 	def get_best_response(self, history: History, player: Player, player_strategy=None):
 		"""
-		TODO: This only works when the action space is constant throughout. We need something mroe customized.
+		TODO: This only works when the action space is constant throughout. We need something more customized.
 		
 		A best response is deterministic. It is a strategy profile that chooses the action that maximizes
 		its expected value.
@@ -379,11 +391,6 @@ class CFR:
 		return br_action, min(ev)
 
 
-		
-	
-
-		
-		
 class InfoSetTracker:
 	"""
 	We also want to use this to track exploitability

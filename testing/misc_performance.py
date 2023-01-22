@@ -50,8 +50,51 @@ def test_binary_vs_modulus():
 		x = (x + 1) % 2
 	print(f"Time for modulus: {time.time() - start}s")
 
+	"""
+	Results:
+	Time for binOp: 0.0013861656188964844s
+	Time for modulus: 0.011712074279785156s
 
+	"""
+
+import sys
+sys.path.append('../src')
+
+from abstraction import *
+
+def test_inference():
+	start = time.time()
+	kmeans_flop, kmeans_turn, kmeans_river = load_kmeans_classifiers()
+	print(f"Time to load kmeans: {time.time() - start}s")
+
+	start = time.time()
+	for i in range(1):
+		get_flop_cluster_id(kmeans_flop, "AhAd2s2d3h")
+	print(f"Average Time to predict flop cluster id: {(time.time() - start)/1}s")
+
+
+	start = time.time()
+	for i in range(10):
+		get_turn_cluster_id(kmeans_turn, "AhAd2s2d3h4s")
+	print(f"Average Time to predict turn cluster id: {(time.time() - start)/100}s")
+
+	start = time.time()
+	for i in range(10):
+		get_river_cluster_id(kmeans_river, "AhAd2s2d3h4s5s")
+	print(f"Average Time to predict river cluster id: {(time.time() - start)/1000}s")
+	
+	"""
+	Results (Prior to optimization)
+	Time to load kmeans: 0.0005240440368652344s
+	Average Time to predict flop cluster id: 2.9904518127441406s
+	Average Time to predict turn cluster id: 0.006986420154571533s
+	Average Time to predict river cluster id: 0.0006327447891235352s
+	
+	
+	"""
 
 
 if __name__ == "__main__":
-	test_binary_vs_modulus()
+	# test_oop_vs_procedural()
+	# test_binary_vs_modulus()
+	test_inference()

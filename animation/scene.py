@@ -15,7 +15,8 @@ Lif of animations I need to make:
 # config.background_color = "#151213" # Dark brown Gray
 # config.background_color = "#262627" # Gray
 # config.background_color = "#121212" # Dark Gray
-config.background_color = PURE_GREEN
+# config.background_color = PURE_GREEN
+config.background_color = BLACK
 Text.set_default(font='Shadows Into Light', color=BLACK)
 
 class NashEquilibriumText(Scene):
@@ -113,17 +114,26 @@ class RPS2(Scene):
         line2 = Line(x2, x2 + DOWN, color=BLACK)
         line3 = Line(x3, x3 + DOWN, color=BLACK)
         
-        line1.add_updater(lambda m: m.put_start_and_end_on([rock.get_x(), 1, 0], x1 + DOWN))
+        line1.add_updater(lambda m: m.put_start_and_end_on([min(rock.get_x(), -0.5), 1, 0], x1 + DOWN))
         line2.add_updater(lambda m: m.put_start_and_end_on([paper.get_x(), 1, 0], x2 + DOWN))
-        line3.add_updater(lambda m: m.put_start_and_end_on([scissors.get_x(), 1, 0], x3 + DOWN))
+        line3.add_updater(lambda m: m.put_start_and_end_on([max(scissors.get_x(), 0.5), 1, 0], x3 + DOWN))
         
         self.play(AnimationGroup(FadeIn(paper2, scale=0.4), FadeIn(scissors2, scale=0.4), FadeIn(rock2, scale=0.4), lag_ratio=0.7), AnimationGroup(Create(line1), Create(line2), Create(line3), lag_ratio=0.7))
         self.wait(1)
         
         q = ImageMobject('assets/question.png').scale(0.5).shift(2*UP)
         self.play(AnimationGroup(AnimationGroup(rock.animate.shift(4*RIGHT), scissors.animate.shift(4*LEFT)), FadeIn(q), lag_ratio=0.3))
+        self.play(FadeOut(rock), FadeOut(scissors), FadeOut(paper))
         self.wait(2)
-
+        self.play(AnimationGroup(AnimationGroup(FadeOut(line1), FadeOut(line2), FadeOut(line3), FadeOut(q)), AnimationGroup(rock2.animate.shift(2.5*UP), paper2.animate.shift(2.5*UP), scissors2.animate.shift(2.5*UP)), lag_ratio=0.3))
+        
+        one_third_text = Text("1/3", font_size=60).next_to(paper2, 2*DOWN)
+        one_third_text2 = Text("1/3", font_size=60).next_to(rock2, 2*DOWN)
+        one_third_text3 = Text("1/3", font_size=60).next_to(scissors2, 2*DOWN)
+        
+        self.play(Write(one_third_text), Write(one_third_text2), Write(one_third_text3))
+        self.wait(2)
+        self.play(FadeOut(one_third_text), FadeOut(one_third_text2), FadeOut(one_third_text3), FadeOut(rock2), FadeOut(paper2), FadeOut(scissors2))
 
 
 # config.background_color = GRAY_BROWN
@@ -141,6 +151,7 @@ class RPSSimRock(Scene):
     """
     When you play rock all the time, you opponent catches on after 10 iterations
     """
+
     def construct(self):
         plane = NumberPlane(
             x_range = (0, 1),
@@ -177,10 +188,14 @@ class RPSSimRock(Scene):
         self.add(Text('Time', font_size=20).next_to(plane, DOWN).shift(2*RIGHT))
         self.add(Text('Win Rate', font_size=20).next_to(plane, LEFT).shift(2*UP))
 
-        for i in range(1,5):
+        for i in range(1,20):
             group = ['rock', 'paper', 'scissors']
-            choice_player = np.random.randint(0,3)
-            choice_opponent = np.random.randint(0,3)
+            # choice_player = np.random.randint(0,3)
+            choice_player = 0
+            if i < 5:
+                choice_opponent = np.random.randint(0,3)
+            else:
+                choice_opponent = 1
             
             if choice_player == choice_opponent:
                 text = Text("Tie.", font_size=50)
@@ -192,7 +207,7 @@ class RPSSimRock(Scene):
                 opponent_score_tracker += 1
             
             x_values.append(i)
-            y_values.append(your_score_tracker.get_value() / i)
+            y_values.append(your_score_tracker.get_value() / (your_score_tracker.get_value() + opponent_score_tracker.get_value()))
 
             player = create_mobject(group[choice_player]).move_to(5*LEFT + DOWN)
             opponent = create_mobject(group[choice_opponent]).move_to(LEFT + DOWN)
@@ -217,10 +232,10 @@ class RPSSimRock(Scene):
             )
             new_plane.shift(4*RIGHT)
 
-            if i <=10:
-                run_time = 1
+            if i <=6:
+                run_time = 0.2
             else:
-                run_time = 0.1
+                run_time = 0.02
             self.play(line_graph.animate.become(new_plane.plot_line_graph(
                 x_values = x_values,
                 y_values = y_values,

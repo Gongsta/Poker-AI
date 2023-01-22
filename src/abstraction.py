@@ -23,11 +23,8 @@ import os
 import glob
 import joblib
 from joblib import Parallel, delayed
-import torch # To run K-means with GPU
-import ot
-
 """
-BET ABSTRACTION
+BET ABSTRACTION, hmm this logic directly encoded in `holdem.py`
 """
 # For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in. 
 
@@ -132,25 +129,8 @@ BET ABSTRACTION
 
 """
 CARD ABSTRACTION
-"""
 
-# Preflop Abstraction
-"""
-For the Pre-flop, we can make a lossless abstraction with exactly 169 buckets. The idea here is that what specific suits
-our private cards are doesn't matter. The only thing that matters is whether both cards are suited or not.
-
-This is how the number 169 is calculated:
-- For cards that are not pocket pairs, we have (13 choose 2) = 13 * 12 / 2 = 78 buckets (since order doesn't matter)
-- These cards that are not pocket pairs can also be suited, so we must differentiate them. We have 78 * 2 = 156 buckets
-- Finally, for cards that are pocket pairs, we have 13 extra buckets (Pair of Aces, Pair of 2, ... Pair Kings). 156 + 13 = 169 buckets
-
-Note that a pair cannot be suited, so we don't need to multiply by 2.
-"""
-
-
-# Flop/Turn/River Abstraction
-
-"""
+Description:
 We the equity of a given hand / paired with a board, the EHS of a pair of cards 
 at different stages of the game, which is calculated assuming a random uniform draw of opponent hands and random uniform rollout of public cards.
 
@@ -172,262 +152,70 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-
-# Modified version of K-Means to add Earth Mover's Distance from here: https://github.com/subhadarship/kmeans_pytorch/blob/master/kmeans_pytorch/__init__.py
-def initialize(X, n_clusters, seed):
+# Preflop Abstraction with 169 buckets (lossless abstraction)
+def get_preflop_cluster_id(two_cards_string): # Lossless abstraction for pre-flop, 169 clusters
+	# cards input ex: Ak2h or ['Ak', '2h']
 	"""
-	initialize cluster centers
-	:param X: (torch.tensor) matrix
-	:param n_clusters: (int) number of clusters
-	:param seed: (int) seed for kmeans
-	:return: (np.array) initial state
-	"""
-	num_samples = len(X)
-	if seed == None:
-		indices = np.random.choice(num_samples, n_clusters, replace=False)
-	else:
-		np.random.seed(seed) ; indices = np.random.choice(num_samples, n_clusters, replace=False)
-	initial_state = X[indices]
-	return initial_state
+	For the Pre-flop, we can make a lossless abstraction with exactly 169 buckets. The idea here is that what specific suits
+	our private cards are doesn't matter. The only thing that matters is whether both cards are suited or not.
 
-def kmeans_custom(
-		X,
-		n_clusters,
-		distance='euclidean',
-		centroids=[],
-		tol=1e-3,
-		tqdm_flag=True,
-		iter_limit=0,
-		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-		seed=None,
-):
-	"""
-	perform kmeans n_init, default=10
-	Number of time the k-means algorithm will be run with different centroid seeds. The final results will be the best output of n_init consecutive runs in terms of inertia.
-	:param X: (torch.tensor) matrix
-    :param num_clusters: (int) number of clusters
-    :param distance: (str) distance [options: 'euclidean', 'cosine'] [default: 'euclidean']
-    :param seed: (int) seed for kmeans
-    :param tol: (float) threshold [default: 0.001]
-    :param device: (torch.device) device [default: cpu]
-    :param tqdm_flag: Allows to turn logs on and off
-    :param iter_limit: hard limit for max number of iterations
-    :param gamma_for_soft_dtw: approaches to (hard) DTW as gamma -> 0
-	Return
-		X_cluster_ids (torch.tensor), centroids (torch.tensor)
-	"""
-	if tqdm_flag:
-		print(f'running k-means on {device}..')
+	This is how the number 169 is calculated:
+	- For cards that are not pocket pairs, we have (13 choose 2) = 13 * 12 / 2 = 78 buckets (since order doesn't matter)
+	- These cards that are not pocket pairs can also be suited, so we must differentiate them. We have 78 * 2 = 156 buckets
+	- Finally, for cards that are pocket pairs, we have 13 extra buckets (Pair of Aces, Pair of 2, ... Pair Kings). 156 + 13 = 169 buckets
 
-	if distance == 'euclidean':
-		pairwise_distance_function = partial(pairwise_distance, device=device, tqdm_flag=tqdm_flag)
-	elif distance == 'cosine':
-		pairwise_distance_function = partial(pairwise_cosine, device=device)
-	elif distance == 'EMD':
-		pairwise_distance_function = partial(pairwise_EMD, device=device)
-
-	else:
-		raise NotImplementedError
-
-	if type(X) != torch.Tensor:
-		X = torch.tensor(X)
-	# convert to float
-	X = X.float()
-
-	# transfer to device
-	X = X.to(device)
-
-	# initialize
-	if type(centroids) == list:  # ToDo: make this less annoyingly weird
-		initial_state = initialize(X, n_clusters, seed=seed)
-	else:
-		if tqdm_flag:
-			print('resuming')
-		# find data point closest to the initial cluster center
-		initial_state = centroids
-		dis = pairwise_distance_function(X, initial_state)
-		choice_points = torch.argmin(dis, dim=0)
-		initial_state = X[choice_points]
-		initial_state = initial_state.to(device)
-
-	iteration = 0
-	if tqdm_flag:
-		tqdm_meter = tqdm(desc='[running kmeans]')
-
-	while True:
-		dis = pairwise_distance_function(X, initial_state)
-
-		choice_cluster = torch.argmin(dis, dim=1)
-
-		initial_state_pre = initial_state.clone()
-
-		for index in range(n_clusters):
-			selected = torch.nonzero(choice_cluster == index).squeeze().to(device)
-
-			selected = torch.index_select(X, 0, selected)
-
-			# https://github.com/subhadarship/kmeans_pytorch/issues/16
-			if selected.shape[0] == 0:
-				selected = X[torch.randint(len(X), (1,))]
-
-			initial_state[index] = selected.mean(dim=0)
-
-		center_shift = torch.sum(
-			torch.sqrt(
-				torch.sum((initial_state - initial_state_pre) ** 2, dim=1)
-			))
-
-		# increment iteration
-		iteration = iteration + 1
-
-		# update tqdm meter
-		if tqdm_flag:
-			tqdm_meter.set_postfix(
-				iteration=f'{iteration}',
-				center_shift=f'{center_shift ** 2:0.6f}',
-				tol=f'{tol:0.6f}'
-			)
-			tqdm_meter.update()
-		if center_shift ** 2 < tol:
-			break
-		if iter_limit != 0 and iteration >= iter_limit:
-			break
-
-	return choice_cluster.cpu(), initial_state.cpu() # clusters_indices_on_initial data, final_centroids
-
-
-def kmeans_custom_predict(
-		X,
-		centroids,
-		distance='euclidean',
-		device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-		tqdm_flag=True
-):
-	"""
-	Return
-		cluster_ids_on_X (torch.tensor)
+	Note that a pair cannot be suited, so we don't need to multiply by 2.
+	
+	Cluster ids:
+	1-13 -> pockets
+	14-91 -> Unsuited cluster pairs that are not pockets
+	92-169 -> Suited cluster pairs that are not pockets
 	
 	"""
-	if tqdm_flag:
-		print(f'predicting on {device}..')
-
-	if distance == 'euclidean':
-		pairwise_distance_function = partial(pairwise_distance, device=device, tqdm_flag=tqdm_flag)
-	elif distance == 'cosine':
-		pairwise_distance_function = partial(pairwise_cosine, device=device)
-	elif distance == 'EMD':
-		pairwise_distance_function = partial(pairwise_EMD, device=device)
-	else:
-		raise NotImplementedError
-
-	# convert to float
-	if type(X) != torch.Tensor:
-		X = torch.tensor(X)
-	X = X.float()
-
-	# transfer to device
-	X = X.to(device)
-
-	dis = pairwise_distance_function(X, centroids)
-	if (len(dis.shape) == 1): # Prediction on a single data
-		choice_cluster = torch.argmin(dis)
-		
-	else: 
-		choice_cluster = torch.argmin(dis, dim=1)
-
-	return choice_cluster.cpu()
-
-
-def pairwise_distance(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'), tqdm_flag=True):
-	if tqdm_flag:
-		print(f'device is :{device}')
+	if type(two_cards_string) == list:
+		two_cards_string = "".join(two_cards_string)
 	
-	# transfer to device
-	data1, data2 = data1.to(device), data2.to(device)
+	assert(len(two_cards_string) == 4)
 
-	A = data1.unsqueeze(dim=1) # N*1*M
-	B = data2.unsqueeze(dim=0) # 1*N*M
-
-	dis = (A - B) ** 2.0
-	# return N*N matrix for pairwise distance
-	dis = dis.sum(dim=-1).squeeze()
-	return dis
-
-
-def pairwise_cosine(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
-	# transfer to device
-	data1, data2 = data1.to(device), data2.to(device)
-
-	A = data1.unsqueeze(dim=1) # N*1*M
-	B = data2.unsqueeze(dim=0) # 1*N*M
-
-	# normalize the points  | [0.3, 0.4] -> [0.3/sqrt(0.09 + 0.16), 0.4/sqrt(0.09 + 0.16)] = [0.3/0.5, 0.4/0.5]
-	A_normalized = A / A.norm(dim=-1, keepdim=True)
-	B_normalized = B / B.norm(dim=-1, keepdim=True)
-
-	cosine = A_normalized * B_normalized
-
-	# return N*N matrix for pairwise distance
-	cosine_dis = 1 - cosine.sum(dim=-1).squeeze()
-	return cosine_dis
-
-
-def pairwise_EMD(data1, data2, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
-	assert(len(data1.shape) == 2)
-	assert(len(data2.shape) == 2)
-	assert(data1.shape[1] == data2.shape[1])
-	n = data1.shape[1]
-	pos_a = torch.tensor([[i] for i in range(n)])
-	pos_b = torch.tensor([[i] for i in range(n)])
-	C = ot.dist(pos_a, pos_b, metric='euclidean')
-	C.to(device)
-
-	# Correct solution, but very slow
-	dist = torch.zeros((data1.shape[0], data2.shape[0]))
-	for i, hist_a in enumerate(data1):
-		for j, hist_b in enumerate(data2):
-			for _ in range(10):  # Janky fix for small precision error
-				try:
-					ot_emd = ot.emd(hist_a, hist_b, C, numThreads="max")  # The precision is set to 7, so sometimes the sum doesn't get to precisely 1. 
-					break
-				except Exception as e:
-					print(e)
-					continue
+	KEY = {"A": 1, "2": 2, "3": 3, "4":4, "5":5, "6":6, # Supports both "T" and "10" as 10
+				"7": 7, "8": 8, "9": 9, "T": 10, "10":10, "J": 11, "Q": 12, "K":13} 
 				
-			transport_cost_matrix = ot_emd * C
-			dist[i][j] = transport_cost_matrix.sum()
+	cluster_id = 0
 	
-	return dist
+	def hash_(a, b):
+		"""
+		A2/2A -> 1
+		A3/3A -> 2
+		A4/4A -> 3
+		...
+		KQ/QK -> 78
+		
+		returns values ranging from 1 to 78
+		"""
+		assert(a != b)
+		assert(len(a) == 1 and len(b) == 1)
+		first = min(KEY[a], KEY[b])
+		second = max(KEY[a], KEY[b])
+		ans = first * (first - 1) / 2 + (second - 1)
+		return int(ans)
 
-def kmeans_search(X):
-	"""
-	We can check for the quality of clustering by checking the inter-cluster distance, using the 
-	same metric that we used for EMD.
-	
-	At some point, there is no point in increasing the number of clusters, since we don't really
-	get more information.
-	"""
-	# Search for the optimal number of clusters through a grid like search
+	if two_cards_string[0] == two_cards_string[2]: # pockets
+		cluster_id = KEY[two_cards_string[0]]
+	elif two_cards_string[1] != two_cards_string[3]: # unsuited that are not pockets
+		cluster_id = 13 + hash_(two_cards_string[0], two_cards_string[2])
+	else: # suited that are not pockets
+		cluster_id = 91 + hash_(two_cards_string[0], two_cards_string[2])
 
-	if type(X) != torch.Tensor:
-		X = torch.tensor(X)
-	# convert to float
-	X = X.float()
+	assert(cluster_id >= 1 and cluster_id <= 169)
 
-	# n_clusters = [10, 25, 50, 100, 200, 1000, 5000]
-	n_clusters = [5000]
-	for n_cluster in n_clusters:
-		cluster_indices, centroids = kmeans(X, n_cluster)
-		X_cluster_centroids = centroids[cluster_indices]
-		distances = 0
-		for i, X_cluster_centroid in enumerate(X_cluster_centroids):
-			distances += pairwise_distance(torch.unsqueeze(X_cluster_centroid, axis=0), torch.unsqueeze(X[i], axis=0), tqdm_flag=False)
-		print(f"Sum of cluster to data distance {distances}")
-		print(f"Mean cluster to data distance {distances / X_cluster_centroids.shape[0]}")
+	return cluster_id
 
-
-	
-
+# Post-Flop Abstraction using Equity Distributions
+def create_abstraction_folders():
+	if not os.path.exists('../data'):
+		for split in ['clusters', 'raw']:
+			for stage in ['flop', 'turn', 'river']:
+				os.makedirs(f'../data/{split}/{stage}')
 
 
 def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=False):
@@ -451,6 +239,7 @@ def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=
 
 	return wins / n
 	
+
 def calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=1000):
 	"""Same as calculate_equity, except that you know your opponents cards as well, so total probability should sum to one.
 	"""
@@ -572,34 +361,7 @@ overlapping, so you always end up in one.
 
 3. For flop, " " (of the turn)
 4. For pre-flop, generate 169 clusters (lossless abstraction).
-
 """
-		
-def generate_preflop_clusters(): # Lossless abstraction for pre-flop, 169 clusters
-	preflop_clusters = {}
-	cluster_i = 0
-	for rank in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"]:
-		preflop_clusters[cluster_i] = rank + 's' # Suited
-		cluster_i += 1
-
-	for rank in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"]:
-		preflop_clusters[cluster_i] = rank + 'o' # Offsuit
-		cluster_i += 1
-
-	for rank in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"]:
-		preflop_clusters[cluster_i] = 2 * rank  # Pairs
-		cluster_i += 1
-	
-	assert(cluster_i == 169) # There should be exactly 169 buckets
-
-	return preflop_clusters
-
-def create_abstraction_folders():
-	if not os.path.exists('../data'):
-		for split in ['clusters', 'raw']:
-			for stage in ['flop', 'turn', 'river']:
-				os.makedirs(f'../data/{split}/{stage}')
-
 
 def generate_postflop_equity_distributions(n_samples, bins,stage=None, save=True, timer=True): # Lossful abstraction for flop, turn and river
 	if timer:
@@ -645,17 +407,14 @@ def generate_postflop_equity_distributions(n_samples, bins,stage=None, save=True
 	
 	
 
-
 def visualize_clustering():
 	"""Visualization higher dimensional data is super interesting.
 	
+	See `notebooks/abstraction_visualization.ipynb`
 	"""
-
-	# TODO: Visualize the clustering by actually seeing how the distributions shown
 	return
 
 		
-
 def get_filenames(folder, extension='.npy'):
 	filenames = []
 	
@@ -666,7 +425,71 @@ def get_filenames(folder, extension='.npy'):
 
 	return filenames
 
+def predict_cluster(kmeans_classifier, cards):
+	"""
+	Idea: instead of having to do this in the algorithm since you precompute the clusters, maybe you can just 
+	use your lookup table with the already simulated game. Is it going to be biased?
+	"""
+	
+	assert(len(cards) % 2 == 0)
+	cards_list = [cards[i:i+2] for i in range(0, len(cards), 2)]
+	# TODO: This will break if you try different buckets (default right now is 5)
+	equity_distributions = calculate_equity_distribution(cards_list[0:2], cards_list[2:])
+	
+	y = kmeans_classifier.predict([equity_distributions])
+	assert(len(y) == 1)
+	return y[0]
 
+def load_kmeans_classifiers():
+	raw_dataset_filenames = sorted(get_filenames(f'../data/clusters/flop'))
+	filename = raw_dataset_filenames[-1] # Take the most recently generated dataset
+
+	centroids = joblib.load(f'../data/clusters/flop/{filename}')
+	kmeans_flop = KMeans(100)
+	kmeans_flop.cluster_centers_ = centroids
+	kmeans_flop._n_threads = -1
+
+	raw_dataset_filenames = sorted(get_filenames(f'../data/clusters/turn'))
+	filename = raw_dataset_filenames[-1] # Take the most recently generated dataset
+	centroids = joblib.load(f'../data/clusters/turn/{filename}')
+	kmeans_turn = KMeans(100)
+	kmeans_turn.cluster_centers_ = centroids
+	kmeans_turn._n_threads = -1
+
+	raw_dataset_filenames = sorted(get_filenames(f'../data/clusters/river'))
+	filename = raw_dataset_filenames[-1] # Take the most recently generated dataset
+	centroids = joblib.load(f'../data/clusters/river/{filename}')
+	kmeans_river = KMeans(100)
+	kmeans_river.cluster_centers_ = centroids
+	kmeans_river._n_threads = -1
+	
+	return kmeans_flop, kmeans_turn, kmeans_river
+		
+
+# TODO: Consider the parallelized case
+def get_flop_cluster_id(kmeans_flop, cards):
+	"""
+	kmeans_flop: KMeans classifier
+	cards: string of cards in the format '2h2dAsKsQh' or ['2h', '2d', 'As', 'Ks', 'Qh']
+	"""
+	if type(cards) == list:
+		cards = ''.join(cards)
+
+	assert(len(cards) == 10) # 2 private cards + 3 community cards
+	return predict_cluster(kmeans_flop, cards)
+
+def get_turn_cluster_id(kmeans_turn, cards):
+	if type(cards) == list:
+		cards = ''.join(cards)
+	assert(len(cards) == 12) # 2 private cards + 4 community cards
+	return predict_cluster(kmeans_turn, cards)
+
+def get_river_cluster_id(kmeans_river, cards):
+	if type(cards) == list:
+		cards = ''.join(cards)
+
+	assert(len(cards) == 14) # 2 private cards + 5 community cards
+	return predict_cluster(kmeans_river, cards)
 	
 import argparse
 from sklearn.cluster import KMeans
@@ -709,7 +532,7 @@ if __name__ == "__main__":
 		if not os.path.exists(f'../data/clusters/{stage}/{filename}'):
 			print(f"Generating the cluster for the {stage}")
 			print(filename)
-			kmeans = KMeans(100) # 100 Clusters seems good using the Elbow Method, see notebook/abstraction_exploration.ipynb
+			kmeans = KMeans(100) # 100 Clusters seems good using the Elbow Method, see `notebook/abstraction_exploration.ipynb` for more details
 			kmeans.fit(equity_distributions) # Perform Clustering
 			centroids = kmeans.cluster_centers_
 			joblib.dump(centroids, f'../data/clusters/{stage}/{filename}')
@@ -720,7 +543,14 @@ if __name__ == "__main__":
 			kmeans.cluster_centers_ = centroids
 			kmeans._n_threads = -1
 		
+		centroids = joblib.load(f'../data/clusters/{stage}/{filename}')
+		# Load KMeans Model
+
+	predict = False
+
+
 		
+
 		# # Visualization of the hands
 		# hands = joblib.load(f'data/raw/{stage}/{filename.split(".")[0]}')  
 		# for i in range(equity_distributions.shape[0]):

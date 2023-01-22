@@ -113,25 +113,15 @@ class KuhnInfoSet(base.InfoSet):
 	This condition is checked when infosets are created.
 	
 	"""
-	def __init__(self, infoSet: List[Action]):
+	def __init__(self, infoSet: List[Action], actions: List[Action], player: Player):
 		assert(len(infoSet) >= 2)
-		super().__init__(infoSet)
+		super().__init__(infoSet, actions, player)
 
-	def actions(self) -> List[Action]:
-		return ['p', 'b']
-	
-	def player(self) -> Player:
-		plays = len(self.infoSet)
-		if plays <= 1:
-			return -1
-		else:
-			return plays % 2
-
-def create_infoSet(infoSet_key: List[Action]):
+def create_infoSet(infoSet_key: List[Action], actions: List[Action], player: Player):
 	"""
 	We create an information set from a history. 
 	"""
-	return KuhnInfoSet(infoSet_key)
+	return KuhnInfoSet(infoSet_key, actions, player)
 	
 	
 def create_history():
