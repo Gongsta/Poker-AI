@@ -55,7 +55,7 @@ class AIPlayer(Player):
 		super().__init__(balance)
 		self.is_AI = True
 	
-	# We are going to have the dumbest AI possible, which is to 
+	# We are going to have the dumbest AI possible, which is to call every time
 	def place_bet(self, observed_env) -> int: # AI will call every time
 		# Very similar function to Player.place_bet, we only call and check
 		action = 'k'
@@ -78,7 +78,7 @@ class AIPlayer(Player):
 			# If you call on the preflop
 			if len(hist.history) == 2:
 				self.current_bet = observed_env.big_blind
-			else:
+			else: # Set the current bet to the amount of the last bet
 				self.current_bet = int(hist.history[-1][1:])
 
 		return action
@@ -231,6 +231,10 @@ class PokerEnvironment():
 		self.finished_playing_game_stage = True
 
 	def update_stage_pot_balance(self):
+		"""
+		Assumes the balances from the players are correct
+		
+		"""
 		self.stage_pot_balance = 0
 		for player in self.players:
 			self.stage_pot_balance += player.current_bet
@@ -251,6 +255,9 @@ class PokerEnvironment():
 				
 		if (action[0] == 'b'):
 			self.first_player_to_place_highest_bet = self.position_in_play
+
+		elif action == "f":
+				self.players[self.position_in_play].playing_current_round = False # Player has folded
 		self.update_stage_pot_balance()
 
 			

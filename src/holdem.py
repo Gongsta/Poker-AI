@@ -14,11 +14,11 @@ class HoldEmHistory(base.History):
 	First two actions are the cards dealt to the players. The rest of the actions are the actions taken by the players.
 		1. ['AkTh', 'QdKd', 'b2', 'c', '/', 'QhJdKs', 'b2', 'c', '/', 'k', 'k']
 	
-	Actions
-	k = check
-	bX = bet X amount (this includes raising)
-	c = call
-	f = fold (you cannot fold if the other player just checked)
+	---- ACTIONS ----
+	- k = check
+	- bX = bet X amount (this includes raising)
+	- c = call
+	- f = fold (you cannot fold if the other player just checked)
 	
 	Every round starts the same way: 
 	Small blind = 1 chip
@@ -42,13 +42,6 @@ class HoldEmHistory(base.History):
 	def __init__(self, history: List[Action] = []):
 		super().__init__(history)
 		
-		# How is this going to be taken account of, when we do training?
-		
-		# # The following values 
-		# self.player_0_balance = None
-		# self.player_1_balance = None
-		# self.total_pot_balance = None
-		# self.stage_pot_balance = None
 	
 	def is_terminal(self):
 		if len(self.history) == 0: return False
@@ -104,10 +97,9 @@ class HoldEmHistory(base.History):
 			current_game_stage_history = self.history[game_stage_start:]
 			return current_game_stage_history, stages[stage_i]
 
-	def actions(self): # TODO: This is really important to get it right
-		if self.is_chance(): # Time to draw cards
-			if len(self.history) > 2 and self.history[-1] != '/':
-				return ['/'] # One must move onto a new game stage, this is what they do in slumbot as well
+	def actions(self):
+		if self.is_chance():
+			if len(self.history) > 2 and self.history[-1] != '/': return ['/'] 
 			else:
 				cards_to_exclude = self.get_current_cards()
 				cards = Deck(cards_to_exclude)
@@ -163,7 +155,7 @@ class HoldEmHistory(base.History):
 					else: # Opponent has bet, so you cannot check
 						actions.remove('k')
 				else:
-					actions.remove('k') # Cannot check
+					actions.remove('k') 
 
 			return actions
 		else:
@@ -226,11 +218,7 @@ class HoldEmHistory(base.History):
 		
 
 	def get_remaining_balance(self, player: Player):
-		"""
-		Calculate the remaining balance for the given player
-		
-		Each player has a balance of 100
-		"""
+		# Each player starts with a balance of 100 at the beginning of each hand
 		return 100 - self.calculate_player_total_up_to_game_stage(player)
 
 	def game_stage_ended(self):
@@ -248,24 +236,15 @@ class HoldEmHistory(base.History):
 			return False
 
 	def player(self):
-		# TODO: check that this is correct
 		"""
 		This part is confusing for heads-up no limit poker, because the player that acts first changes:
 		The Small Blind (SB) acts first pre-flop, but the Big Blind (BB) acts first post-flop.
 		1. ['AkTh', 'QdKd', 'b2', 'c', '/', 'Qh', 'b2', 'c', '/', '2d', b2', 'f']
 							 SB	   BB		 	   BB	 SB 	   		BB 	 SB
 		"""
-		# Chance nodes, we have to draw cards
-		if len(self.history) <= 1: 
-			return -1
-		
-		# End of a game stage, we need to draw a new card
-		elif self.game_stage_ended():
-			# Next action is '/'
-			return -1
-		elif self.history[-1] == '/':
-			# Next action is drawing one of the community cards
-			return -1
+		if len(self.history) <= 1: return -1
+		elif self.game_stage_ended(): return -1
+		elif self.history[-1] == '/': return -1
 		else:
 			if '/' in self.history:
 				return (len(self.history) + 1) % 2 # Order is flipped post-flop
@@ -288,7 +267,6 @@ class HoldEmHistory(base.History):
 
 
 	def terminal_utility(self, i: Player) -> int:
-		# TODO: Check if this is accurate
 		assert(self.is_terminal()) # We can only call the utility for a terminal history
 		assert(i in [0, 1]) # Only works for 2 player games for now
 		
@@ -360,62 +338,49 @@ class HoldEmHistory(base.History):
 		new_history = HoldEmHistory(self.history + [action])
 		return new_history
 	
-	def get_infoSet_key(self, kmeans_flop = None, kmeans_turn = None, kmeans_river = None) -> List[Action]:
-		"""
-		This gets a little complicated with card abstraction.
-		
-		I implement imperfect-recall abstraction, which means that you lose some information. This means that at each layer, 
-		there is a different level of abstraction.
-		
-		Preflop
-		2 private cards -> Hash bucket
-		
-		Flop
-		2 private cards + 3 community cards -> Hash bucket
-		
-		"""
-		
-
-		assert(not self.is_chance()) # chance history should not be infosets
+	def get_infoSet_key(self, kmeans_flop, kmeans_turn, kmeans_river) -> List[Action]:
+		assert(not self.is_chance()) 
 		assert(not self.is_terminal())
 
 		player = self.player()
-		
-		"""
-		There are so many decision points.
-		
-		As a starting part, assume that all the cards are the same, and just run CFR for a particular bet sequence.
-		"""
+		history = copy.deepcopy(self.history) 
+		print(history)
 
+		# ----- Assign cluster ID for PREFLOP -----
+		player_cards = []
 		if player == 0:
-			history = copy.deepcopy(self.history)
-			history[1] = '?' # Unknown card
+			player_cards = history[0]
+			history[0] = get_preflop_cluster_id(history[0])
+			history[1] = '?'
 		else:
-			history = copy.deepcopy(self.history)
-			history[0] = '?' # Unknown card
+			player_cards = history[1]
+			history[0] = '?'
+			history[1] = get_preflop_cluster_id(history[1])
 			
-		# TODO: Replace with proper card abstraction, right now replaces all of them with '?'
-		if kmeans_flop is not None:
-			"""
-			['preflop4', '?', 'b2', 'c', '/', 'flop1', 'b2', 'c', '/', 'k', 'k']
+		# ----- Assign cluster ID for FLOP/TURN/RIVER -----
+		community_cards = ''
+		new_stage = False
+		stage_i = 0
+		for i, action in enumerate(history):
+			if new_stage:
+				new_stage = False
+				if stage_i == 1:
+					assert(len(action) == 6)
+					community_cards += action
+					history[i] = get_flop_cluster_id(kmeans_flop, player_cards+community_cards)
+
+				elif stage_i == 2:
+					assert(len(action) == 2)
+					community_cards += action
+					history[i] = get_turn_cluster_id(kmeans_turn, player_cards+community_cards)
+				elif stage_i == 3:
+					assert(len(action) == 2)
+					community_cards += action
+					history[i] = get_river_cluster_id(kmeans_river, player_cards+community_cards)
+			elif action == '/':
+				new_stage = True
+				stage_i += 1
 			
-			"""
-
-			cards = self.get_current_cards()
-			print("Cards running under get_infoSet_key(): ", cards)
-			if player == 0:
-				if len(cards) >= 2:
-					cluster_id = "preflop" + str(get_preflop_cluster_id(cards[0:2]))
-					history[0] = cluster_id
-
-				if len(cards) == 5:
-					cluster_id = "flop" + str(get_flop_cluster_id(kmeans_flop, cards))
-				if len(cards) == 6:
-					cluster_id = "turn" + str(get_turn_cluster_id(kmeans_turn, cards))
-				if len(cards) == 7:
-					cluster_id = "river" + str(get_river_cluster_id(kmeans_river, cards))
-			else:
-				raise Exception("Invalid number of cards")
 
 		return history
 
@@ -452,38 +417,51 @@ def create_history():
 	
 	
 # CFR with abstraction integrated
-class AbstractCFR(base.CFR):
-	def __init__(self, create_infoSet, create_history, n_players: int = 2, iterations: int = 1000000):
+class HoldemAbstractCFR(base.CFR):
+	def __init__(self, create_infoSet, create_history, kmeans_flop, kmeans_turn, kmeans_river,  n_players: int = 2, iterations: int = 1000000,):
 		super().__init__(create_infoSet, create_history, n_players, iterations)
 	
 
 if __name__ == "__main__":
 	kmeans_flop, kmeans_turn, kmeans_river = load_kmeans_classifiers()
-	cfr = base.CFR(create_infoSet, create_history)
-	cfr.solve()
+	# cfr = HoldemAbstractCFR(create_infoSet, create_history)
+	# cfr.solve()
+	
+	"""
+	When we work with these abstractions, we have two types:
+	1. Action Abstraction
+	2. Card Abstraction
+	
+	Both of these are implemented in a different way.
+	
+	"""
+	
+
 	
 	
 
 	
 
-	# hist: HoldEmHistory = create_history()
-	# assert(hist.player() == -1)
-	# hist1 = hist + 'AkTh'
-	# assert(hist1.player() == -1)
-	# hist2 = hist1 + 'QdKd'
-	# assert(hist2.player() == 0)
-	# hist3 = hist2 + 'b2'
-	# assert(hist3.player() == 1)
-	# hist4 = hist3 + 'c'
-	# assert(hist4.player() == -1)
-	# # Below are chance events, so it doesn't matter which player it is
-	# hist5 = hist4 + '/'
-	# assert(hist5.player() == -1)
-	# hist6 = hist5 + 'QhKsKd'
-	# assert(hist6.player() == 1)
-	# hist7 = hist6 + 'b1'
-	# hist8: HoldEmHistory = hist7 + 'b3'
-	# print(hist8.get_infoSet_key())
+	hist: HoldEmHistory = create_history()
+	assert(hist.player() == -1)
+	hist1 = hist + 'AkTh'
+	assert(hist1.player() == -1)
+	hist2 = hist1 + 'QdKd'
+	assert(hist2.player() == 0)
+	print(hist2.get_infoSet_key(kmeans_flop, kmeans_turn, kmeans_river))
+	hist3 = hist2 + 'b2'
+	assert(hist3.player() == 1)
+	hist4 = hist3 + 'c'
+	assert(hist4.player() == -1)
+	# Below are chance events, so it doesn't matter which player it is
+	hist5 = hist4 + '/'
+	assert(hist5.player() == -1)
+	hist6 = hist5 + 'QhKsKh'
+	assert(hist6.player() == 1)
+	hist7 = hist6 + 'b1'
+	hist8: HoldEmHistory = hist7 + 'b3'
+	curr = time.time()
+	print(hist8.get_infoSet_key(kmeans_flop, kmeans_turn, kmeans_river), time.time() - curr)
 
 	# cfr = base.CFR(create_infoSet, create_history)
 	# cfr.solve()

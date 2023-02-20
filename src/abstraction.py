@@ -425,16 +425,10 @@ def get_filenames(folder, extension='.npy'):
 
 	return filenames
 
-def predict_cluster(kmeans_classifier, cards):
-	"""
-	Idea: instead of having to do this in the algorithm since you precompute the clusters, maybe you can just 
-	use your lookup table with the already simulated game. Is it going to be biased?
-	"""
-	
+def predict_cluster(kmeans_classifier, cards, n=200):
 	assert(len(cards) % 2 == 0)
 	cards_list = [cards[i:i+2] for i in range(0, len(cards), 2)]
-	# TODO: This will break if you try different buckets (default right now is 5)
-	equity_distributions = calculate_equity_distribution(cards_list[0:2], cards_list[2:])
+	equity_distributions = calculate_equity_distribution(cards_list[0:2], cards_list[2:], n=n)
 	
 	y = kmeans_classifier.predict([equity_distributions])
 	assert(len(y) == 1)
@@ -466,7 +460,6 @@ def load_kmeans_classifiers():
 	return kmeans_flop, kmeans_turn, kmeans_river
 		
 
-# TODO: Consider the parallelized case
 def get_flop_cluster_id(kmeans_flop, cards):
 	"""
 	kmeans_flop: KMeans classifier
@@ -479,12 +472,20 @@ def get_flop_cluster_id(kmeans_flop, cards):
 	return predict_cluster(kmeans_flop, cards)
 
 def get_turn_cluster_id(kmeans_turn, cards):
+	"""
+	kmeans_turn: KMeans classifier
+	cards: string of cards in the format '2h2dAsKsQh' or ['2h', '2d', 'As', 'Ks', 'Qh']
+	"""
 	if type(cards) == list:
 		cards = ''.join(cards)
 	assert(len(cards) == 12) # 2 private cards + 4 community cards
 	return predict_cluster(kmeans_turn, cards)
 
 def get_river_cluster_id(kmeans_river, cards):
+	"""
+	kmeans_river: KMeans classifier
+	cards: string of cards in the format '2h2dAsKsQh' or ['2h', '2d', 'As', 'Ks', 'Qh']
+	"""
 	if type(cards) == list:
 		cards = ''.join(cards)
 

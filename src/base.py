@@ -45,8 +45,6 @@ class History:
 	In our 2 player version, Player 0 always is the first to act and player 1 is the second to act.
 	However, be warned that in a game such as Heads-Up NL Hold'Em, in later game stages, player 1 (big blind)
 	might be first to act.
-
-	
 	"""
 	def __init__(self, history: List[Action] = []):
 		self.history = history
@@ -57,10 +55,9 @@ class History:
 	def actions(self) -> List[Action]:
 		raise NotImplementedError()
 
-	def player(self) -> Player:
+	def player(self) -> Player: 
+		# If chance event, return -1 as described in CFR paper
 		assert(not self.is_terminal()) 
-		# Note, this might returns a chance event possiblity, where you need to implement a chance function
-		# If chance event, return -1
 		raise NotImplementedError()
 
 	def is_chance(self) -> bool:
@@ -71,14 +68,19 @@ class History:
 		raise NotImplementedError()
 
 	def terminal_utility(self, i: Player) -> int:
-		assert(self.is_terminal()) # We can only call the utility for a terminal history
-		assert(i in [0, 1]) # Only works for 2 player games for now
+		assert(self.is_terminal()) 
+		assert(i in [0, 1]) 
 
 		raise NotImplementedError()
 	
 	def __add__(self, action: Action):
-		# new_history = History(self.history + [action])
-		# return new_history
+		"""
+		This should always be something like:
+		
+			new_history = HoldemHistory(self.history + [action])
+			return new_history
+
+		"""
 		raise NotImplementedError()
 	
 	def get_infoSet_key(self) -> List[Action]:
@@ -258,8 +260,7 @@ class CFR:
 		return 
 
 
-	
-	def solve(self, method='vanilla'):
+	def solve(self, method='vanilla_spedup'):
 		util_0 = 0
 		util_1 = 0
 		for t in tqdm(range(self.iterations), desc = "CFR Training Loop"):

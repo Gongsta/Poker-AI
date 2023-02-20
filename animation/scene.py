@@ -151,16 +151,35 @@ class RPSSimRock(Scene):
     """
     When you play rock all the time, you opponent catches on after 10 iterations
     """
-
     def construct(self):
+        background = ImageMobject('assets/background.png').scale(0.4)
+        self.add(background)
+        
+        
+        self.wait(2)
+        rock = create_mobject('rock').shift(UP)
+        hundred = Text("100%", font_size=100).shift(1.2*DOWN)
+        self.play(FadeIn(rock), FadeIn(hundred))
+        self.wait(2)
+
+        
+
+        
+
+
         plane = NumberPlane(
             x_range = (0, 1),
             y_range = (0, 1, 0.5),
             x_length=4,
             y_length=4,
-            axis_config={"include_numbers": True},
+            background_line_style={
+                "stroke_width": 0
+            },
+            axis_config={"include_numbers": True, "color": BLACK},
             y_axis_config={"label_direction": LEFT},
         )
+        plane.get_x_axis().numbers.set_color(BLACK)
+        plane.get_y_axis().numbers.set_color(BLACK)
         # plane.center()
         plane.shift(4*RIGHT)
         x_values = [0]
@@ -169,11 +188,9 @@ class RPSSimRock(Scene):
             x_values = x_values,
             y_values = y_values,
             line_color=GOLD_E,
-            vertex_dot_style=dict(stroke_width=3),
+            vertex_dot_radius=0,
             stroke_width = 4,
         )
-        self.add(plane, line_graph)
-        
         
         your_score_tracker = ValueTracker(0)
         opponent_score_tracker = ValueTracker(0)
@@ -182,18 +199,21 @@ class RPSSimRock(Scene):
         your_score_placeholder = Text('0', font_size=80).next_to(you, DOWN)
         opponent_score_placeholder = Text('0', font_size=80).next_to(opp, DOWN)
         
-        self.add(you, opp, your_score_placeholder, opponent_score_placeholder)
+        self.play(rock.animate.move_to(5*LEFT + DOWN), FadeOut(hundred), FadeIn(plane, line_graph, you, opp, your_score_placeholder, opponent_score_placeholder, Text('Win Rate over Time', font_size=30).next_to(plane, UP), Text('Time', font_size=20).next_to(plane, DOWN).shift(2*RIGHT), Text('Win Rate', font_size=20).next_to(plane, LEFT).shift(2*UP)))
+        self.wait(1)
         
-        self.add(Text('Win Rate over Time', font_size=30).next_to(plane, UP))
-        self.add(Text('Time', font_size=20).next_to(plane, DOWN).shift(2*RIGHT))
-        self.add(Text('Win Rate', font_size=20).next_to(plane, LEFT).shift(2*UP))
 
-        for i in range(1,20):
+        for i in range(1,25):
             group = ['rock', 'paper', 'scissors']
             # choice_player = np.random.randint(0,3)
             choice_player = 0
-            if i < 5:
-                choice_opponent = np.random.randint(0,3)
+
+            if i == 1:
+                choice_opponent = 0
+            elif i == 2:
+                choice_opponent = 1
+            elif i == 3:
+                choice_opponent = 2
             else:
                 choice_opponent = 1
             
@@ -207,7 +227,10 @@ class RPSSimRock(Scene):
                 opponent_score_tracker += 1
             
             x_values.append(i)
-            y_values.append(your_score_tracker.get_value() / (your_score_tracker.get_value() + opponent_score_tracker.get_value()))
+            if (your_score_tracker.get_value() + opponent_score_tracker.get_value()) == 0:
+                y_values.append(0)
+            else:
+                y_values.append(your_score_tracker.get_value() / (your_score_tracker.get_value() + opponent_score_tracker.get_value()))
 
             player = create_mobject(group[choice_player]).move_to(5*LEFT + DOWN)
             opponent = create_mobject(group[choice_opponent]).move_to(LEFT + DOWN)
@@ -218,29 +241,37 @@ class RPSSimRock(Scene):
             text.shift(DOWN + 3*LEFT)
             self.play(AnimationGroup(FadeIn(player), FadeIn(opponent),
                         ), run_time=0.1)
+            self.remove(rock)
             self.add(text)
             self.play(AnimationGroup(your_score_placeholder.animate.become(your_score_updated), opponent_score_placeholder.animate.become(opponent_score_updated), run_time=0.2))
             # self.wait(0.2)
             
             new_plane = NumberPlane(
                 x_range = (0, i),
-                y_range = (0, 1, round(max(1/(i+1), 0.2), 1)),
+                y_range = (0, 1, 0.5),
                 x_length=4,
                 y_length=4,
-                axis_config={"include_numbers": True},
+                background_line_style={
+                    "stroke_width": 0
+                },
+                axis_config={"include_numbers": True, "color": BLACK},
                 y_axis_config={"label_direction": LEFT},
             )
+            new_plane.get_x_axis().numbers.set_color(BLACK)
+            new_plane.get_y_axis().numbers.set_color(BLACK)
             new_plane.shift(4*RIGHT)
 
-            if i <=6:
-                run_time = 0.2
+            if i <=3:
+                run_time = 0.5
+            elif i <= 7:
+                run_time = 0.25
             else:
-                run_time = 0.02
+                run_time = 0.05
             self.play(line_graph.animate.become(new_plane.plot_line_graph(
                 x_values = x_values,
                 y_values = y_values,
                 line_color=GOLD_E,
-                vertex_dot_style=dict(stroke_width=3),
+                vertex_dot_radius=0,
                 stroke_width = 4,
             )), plane.animate.become(new_plane), run_time=run_time)
 

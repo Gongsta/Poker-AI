@@ -16,6 +16,7 @@ pygame.mixer.init() # For sounds
 
 SCALE = 1
 WIDTH, HEIGHT = 1280, 720
+# WIDTH, HEIGHT = 1289, 791
 # WIDTH, HEIGHT = 1600, 900
 
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -28,7 +29,8 @@ GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 FPS = 60
 
-POKER_BACKGROUND = pygame.transform.scale(pygame.image.load("assets/poker-table.jpg"), (WIDTH, HEIGHT))
+# POKER_BACKGROUND = pygame.transform.scale(pygame.image.load("assets/poker-table(OLD).jpg"), (WIDTH, HEIGHT))
+POKER_BACKGROUND = pygame.transform.scale(pygame.image.load("assets/poker-table.png"), (WIDTH, HEIGHT))
 
 FLOP_1_CARD_POSITION = (400,HEIGHT/2 - 65)
 FLOP_2_CARD_POSITION = (490, HEIGHT/2 - 65)

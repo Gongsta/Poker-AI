@@ -48,11 +48,38 @@ Example of a game sequence that reaches showdown: cb300c/kk/kb300c/kb1200c
 import requests
 import sys
 import argparse
+import os
+import joblib
 
+sys.path.append('../src')
+
+from abstraction import calculate_equity, calculate_equity_distribution, calculate_face_up_equity, plot_equity_hist
 host = 'slumbot.com'
 
-USERNAME = "stevengongYT"
-PASSWORD = "subscribe" # I don't mind putting my password here because there is no way to change the password
+"""
+Here are the strategies that we want to test out. Since Poker is high variance, we need to run each of these for a long time:
+- (Strategy 0) Always check or call
+- (Strategy 1) Only play the hands where you have over 50% chance of winning using my `calculate_equity` function
+- (Strategy 2) Use the CFR algorithm
+"""
+STRATEGY = 1 # SET THE STRATEGY HERE
+
+history = []
+if STRATEGY == 0:
+	USERNAME = "steveng_call"
+	PASSWORD = "callingstation" 
+elif STRATEGY == 1:
+	USERNAME = "steveng_equity"
+	PASSWORD = "equitybet" 
+elif STRATEGY == 2:
+	USERNAME = "steveng_cfr"
+	PASSWORD = "cfrpleasework"
+
+if os.path.exists(f'../data/slumbot/{USERNAME}.joblib'): # Load previous history if it exists
+	history = joblib.load(f'../data/slumbot/{USERNAME}.joblib')
+
+if not os.path.exists('../data/slumbot'):
+	os.makedirs('../data/slumbot')
 
 NUM_STREETS = 4
 SMALL_BLIND = 50
@@ -278,36 +305,61 @@ def Act(token, action):
 	return r
 	
 
-def ComputeStrategy(hole_cards, board, action): 
+
+
+
+def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY): 
 	# a is returned by the ParseAction() function
 	a = ParseAction(action)
 	# This sample program implements a naive strategy of "always check or call".
-	if a['last_bettor'] != -1:
-		incr = 'c'
-	else:
-		incr = 'k'
+
+	if strategy == 0: # always check or call
+		if a['last_bettor'] == -1: # no one has bet yet
+			incr = 'k'
+		else: # opponent has bet, so simply call
+			incr = 'c'
+	elif strategy == 1:
+		equity = calculate_equity(hole_cards, board, n=5000)
+		print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
+		if a['last_bettor'] == -1:
+			if equity >= 0.5:
+				incr = 'b1000'
+			else:
+				incr = 'k'
+		else:
+			if equity >= 0.5:
+				incr = 'c'
+			else:
+				incr = 'f'
+
+
 	return incr
 
-def PlayHand(token):
+def PlayHand(token, debug=False):
 	r = NewHand(token)
 	# We may get a new token back from /api/new_hand
 	new_token = r.get('token')
 	if new_token:
 		token = new_token
-	print('Token: %s' % token)
+
 	while True:
-		print('-----------------')
-		print(repr(r))
+		if r.get('session_num_hands'):
+			history.append(r)
+			print(f"Total hands played:{r.get('session_num_hands')} Total Profit: {r.get('session_total')} Total Relative Profit: {r.get('session_baseline_total')}")
+		if debug:
+			print('-----------------')
+			print(repr(r))
 		action = r.get('action')
 		client_pos = r.get('client_pos')
 		hole_cards = r.get('hole_cards')
 		board = r.get('board')
 		winnings = r.get('winnings')
-		print('Action: %s' % action)
-		if client_pos:
-			print('Client pos: %i' % client_pos)
-		print('Client hole cards: %s' % repr(hole_cards))
-		print('Board: %s' % repr(board))
+		if debug:
+			print('Action: %s' % action)
+			if client_pos:
+				print('Client pos: %i' % client_pos)
+			print('Client hole cards: %s' % repr(hole_cards))
+			print('Board: %s' % repr(board))
 		if winnings is not None:
 			print('Hand winnings: %i' % winnings)
 			return (token, winnings)
@@ -318,7 +370,8 @@ def PlayHand(token):
 			sys.exit(-1)
 		
 		incr = ComputeStrategy(hole_cards, board, action)
-		print('Sending incremental action: %s' % incr)
+		if debug:
+			print('Sending incremental action: %s' % incr)
 		r = Act(token, incr)
 	# Should never get here
 
@@ -371,11 +424,14 @@ def main():
 	# To avoid SSLError:
 	#   import urllib3
 	#   urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-	num_hands = 100
+	num_hands = 100000
 	winnings = 0
 	for h in range(num_hands):
 		(token, hand_winnings) = PlayHand(token)
 		winnings += hand_winnings
+		if h % 100 == 0:
+			print(history)
+			joblib.dump(history, f'../data/slumbot/{USERNAME}.joblib')
 	print('Total winnings: %i' % winnings)
 
 	
