@@ -153,9 +153,10 @@ class InfoSet:
 			
 		
 class CFR:
-	def __init__(self, create_infoSet, create_history, n_players: int = 2, iterations: int = 1000000):
+	def __init__(self, create_infoSet, create_history, n_players: int = 2, iterations: int = 1000000, tracker_interval=50000):
 		self.n_players = n_players
 		self.iterations = iterations
+		self.tracker_interval = tracker_interval
 		self.infoSets: Dict[str, InfoSet] = {}
 		self.create_infoSet = create_infoSet
 		self.create_history = create_history
@@ -180,12 +181,12 @@ class CFR:
 		# Return payoff for terminal states
 		if history.is_terminal():
 			if debug:
-				print(history.history, history.terminal_utility(i))
+				print(f"history: {history.history} utility: {history.terminal_utility(i)}")
 				time.sleep(1)
 			return history.terminal_utility(i)
 		elif history.is_chance():
 			a = history.sample_chance_outcome() # $\sigma_c$ is simply the $f_c$ function I believe...
-			return self.vanilla_cfr(history + a, i, t, pi_0, pi_1) # Since it is a chance outcome, the player does not change .. TODO: Check logic for this
+			return self.vanilla_cfr(history + a, i, t, pi_0, pi_1, debug=debug) # Since it is a chance outcome, the player does not change .. TODO: Check logic for this
 		
 		infoSet = self.get_infoSet(history)
 		assert(infoSet.player() == history.player())
@@ -198,9 +199,9 @@ class CFR:
 
 		for a in infoSet.actions():
 			if history.player() == 0:
-				va[a] = self.vanilla_cfr(history + a, i, t, infoSet.strategy[a] * pi_0, pi_1)
+				va[a] = self.vanilla_cfr(history + a, i, t, infoSet.strategy[a] * pi_0, pi_1, debug=debug)
 			else:
-				va[a] = self.vanilla_cfr(history + a, i, t, pi_0, infoSet.strategy[a] * pi_1)
+				va[a] = self.vanilla_cfr(history + a, i, t, pi_0, infoSet.strategy[a] * pi_1, debug=debug)
 
 			v += infoSet.strategy[a] * va[a]
 		
@@ -227,7 +228,7 @@ class CFR:
 			return history.terminal_utility(0)
 		elif history.is_chance():
 			a = history.sample_chance_outcome() # $\sigma_c$ is simply the $f_c$ function I believe...
-			return self.vanilla_cfr_speedup(history + a, t, pi_0, pi_1) # Since it is a chance outcome, the player does not change .. TODO: Check logic for this
+			return self.vanilla_cfr_speedup(history + a, t, pi_0, pi_1, debug=debug) # Since it is a chance outcome, the player does not change .. TODO: Check logic for this
 		
 		infoSet = self.get_infoSet(history)
 		assert(infoSet.player() == history.player())
@@ -240,9 +241,9 @@ class CFR:
 
 		for a in infoSet.actions():
 			if history.player() == 0:
-				va[a] = - self.vanilla_cfr_speedup(history + a, t, infoSet.strategy[a] * pi_0, pi_1)
+				va[a] = - self.vanilla_cfr_speedup(history + a, t, infoSet.strategy[a] * pi_0, pi_1, debug=debug)
 			else:
-				va[a] = - self.vanilla_cfr_speedup(history + a, t, pi_0, infoSet.strategy[a] * pi_1)
+				va[a] = - self.vanilla_cfr_speedup(history + a, t, pi_0, infoSet.strategy[a] * pi_1, debug=debug)
 
 			v += infoSet.strategy[a] * va[a]
 		
@@ -256,30 +257,78 @@ class CFR:
 		
 		return v
 	
+	def vanilla_cfr_manim(self, history: History, i: Player, t: int, pi_0: float, pi_1: float, histories: List[History]):
+		# Return payoff for terminal states
+		if history.is_terminal():
+			histories.append(history)
+			return history.terminal_utility(i)
+		elif history.is_chance():
+			a = history.sample_chance_outcome() # $\sigma_c$ is simply the $f_c$ function I believe...
+			return self.vanilla_cfr_manim(history + a, i, t, pi_0, pi_1, histories) # Since it is a chance outcome, the player does not change .. TODO: Check logic for this
+		
+		infoSet = self.get_infoSet(history)
+		assert(infoSet.player() == history.player())
+		
+		
+		v = 0
+		va = {}
+
+		for a in infoSet.actions():
+			if history.player() == 0:
+				va[a] = self.vanilla_cfr_manim(history + a, i, t, infoSet.strategy[a] * pi_0, pi_1, histories)
+			else:
+				va[a] = self.vanilla_cfr_manim(history + a, i, t, pi_0, infoSet.strategy[a] * pi_1, histories)
+
+			v += infoSet.strategy[a] * va[a]
+		
+		if history.player() == i:
+			for a in infoSet.actions():
+				infoSet.regret[a] += (pi_1 if i == 0 else pi_0) * (va[a] - v)
+				# Update cumulative strategy values, this will be used to calculate the average strategy at the end
+				infoSet.cumulative_strategy[a] += (pi_0 if i == 0 else pi_1) * infoSet.strategy[a] 
+				
+			# Update regret matching values
+			infoSet.get_strategy()
+		
+		return v
 	def mccfr(self, history: History, i: Player, t: int, pi_0: float, pi_1: float, debug=False): # Works for two players
 		return 
 
 
-	def solve(self, method='vanilla_spedup'):
+	def solve(self, method='vanilla_speedup', debug=False):
 		util_0 = 0
 		util_1 = 0
+		if method == 'manim':
+			histories = []
+
 		for t in tqdm(range(self.iterations), desc = "CFR Training Loop"):
-			if method == 'vanilla':
+			if method == 'vanilla_speedup':
+				util_0 += self.vanilla_cfr_speedup(self.create_history(), t, 1, 1, debug=debug)
+			
+			elif method == 'manim' and t < 10:
+				for player in range(self.n_players): 
+					if player == 0:
+						util_0 += self.vanilla_cfr_manim(self.create_history(), player, t, 1, 1, histories)
+					else:
+						util_1 += self.vanilla_cfr_manim(self.create_history(), player, t, 1, 1, histories)
+				
+				print(histories)
+
+			else: # vanilla
 				for player in range(self.n_players): # This is the slower way, we can speed by updating both players
 					if player == 0:
-						util_0 += self.vanilla_cfr(self.create_history(), player, t, 1, 1)
+						util_0 += self.vanilla_cfr(self.create_history(), player, t, 1, 1, debug=debug)
 					else:
-						util_1 += self.vanilla_cfr(self.create_history(), player, t, 1, 1)
-			
-			
-				if ((t + 1)% 100000 == 0):
-					print("Average game value player 0: ", util_0/t)
-					print("Average game value player 1: ", util_1/t)
-					self.tracker(self.infoSets)
-					self.tracker.pprint()
-				
-			elif method == 'vanilla_speedup':
-				util_0 += self.vanilla_cfr_speedup(self.create_history(), t, 1, 1)
+						util_1 += self.vanilla_cfr(self.create_history(), player, t, 1, 1, debug=debug)
+
+			if ((t + 1) % self.tracker_interval == 0):
+				print("Average game value player 0: ", util_0/t)
+				print("Average game value player 1: ", util_1/t)
+				self.tracker(self.infoSets)
+				self.tracker.pprint()
+
+		if method == 'manim':
+			return histories
 
 	def export_infoSets(self):
 		joblib.dump(self.infoSets, "holdem_infoSets.joblib")

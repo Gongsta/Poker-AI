@@ -19,6 +19,351 @@ Lif of animations I need to make:
 config.background_color = BLACK
 Text.set_default(font='Shadows Into Light', color=BLACK)
 
+
+from manim import *
+import sys
+from tqdm import tqdm
+
+sys.path.append("../src")
+import base
+from base import Player, Action, History, InfoSet
+from kuhn import create_history, create_infoSet
+import random
+from typing import NewType, Dict, List, Callable, cast
+import copy
+
+
+class ManimCFR(base.CFR):
+    """
+    I want to see the algorithm in action when I call `solve()`
+    """
+    def __init__(self, create_infoSet, create_history, n_players: int = 2, iterations: int = 100, tracker_interval: int = 10):
+        super().__init__(create_infoSet, create_history, n_players, iterations, tracker_interval)
+
+# config.disable_caching = True
+
+class KuhnPart1(Scene):
+    def construct(self):
+        
+
+        background = ImageMobject('assets/poker-table-background.jpeg').scale(2)
+        # background = ImageMobject('assets/table2.jpeg').scale(2)
+        self.add(background)
+
+        kuhnPoker = Text("Kuhn Poker", color=WHITE).scale(2.5)
+        self.play(Write(kuhnPoker))
+        
+        self.wait(2)
+        self.play(FadeOut(kuhnPoker))
+
+        ace = ImageMobject('../assets/Ac.png').shift(3*LEFT)
+        king = ImageMobject('../assets/Kc.png')
+        queen = ImageMobject('../assets/Qc.png').shift(3*RIGHT)
+        
+        self.play(FadeIn(ace, run_time=0.5))
+        self.play(FadeIn(king, run_time=0.5))
+        self.play(FadeIn(queen, run_time=0.5))
+        
+        self.wait(1)
+
+        # youText = Text("You", color=WHITE, font_size=34).move_to(2*RIGHT)
+        # opponentText = Tex("Opponent", color=WHITE, font_size=34).move_to(2*DOWN + 2*RIGHT)
+        # self.play(AnimationGroup(king.animate.shift(2*RIGHT), Write(youText), lag_ratio=0.8))
+        # self.wait(0.5)
+
+        # Queen or Ace??
+        # self.play(AnimationGroup(AnimationGroup(queen.animate.shift(2*DOWN + 2*RIGHT).scale(1.5), FadeOut(back)), Write(opponentText), lag_ratio=0.8))
+        
+        # ace.scale(0.75).move_to(0.5 * DOWN + 2*RIGHT)
+        # self.play(AnimationGroup(FadeIn(ace), FadeOut(queen), run_time=0.8))
+        # self.play(AnimationGroup(FadeIn(queen), FadeOut(ace), run_time=0.8))
+        # self.play(AnimationGroup(FadeIn(ace), FadeOut(queen), run_time=0.8))
+        
+        # unknown = ImageMobject('../assets/unknown.png').scale(0.75).move_to(0.5 * DOWN + 2*RIGHT)
+        # self.play(AnimationGroup(FadeIn(unknown), FadeOut(ace), run_time=0.8))
+
+        # self.play(ace.animate.shift(2*DOWN + 2*RIGHT).scale(1.5), queen.animate.shift(2*DOWN + 4*RIGHT).scale(1.5))
+        
+
+        
+config.background_color = "#1c5d2c" 
+class Kuhn(MovingCameraScene):
+    def construct(self):
+        
+
+        back = ImageMobject('../assets/back.png')
+        king = ImageMobject('../assets/Kc.png').shift(UP).scale(0.6)
+
+        self.add(king)
+
+        
+        check = Tex("Check", color=WHITE, font_size=34).move_to(1.5*LEFT +1.2 * DOWN)
+        bet = Tex("Bet", color=WHITE, font_size=34).move_to(1.5*RIGHT + 1.2 * DOWN)
+        
+        check_line = Line(king.get_center() + 0.7 * DOWN, check.get_center(), color=WHITE, buff=0.5)
+        bet_line = Line(king.get_center() + 0.7 * DOWN, bet.get_center(), color=WHITE, buff=0.5)
+        
+        self.play(AnimationGroup(Create(check_line), Write(check), lag_ratio=0.5, run_time=1))
+        self.wait(0.3)
+        self.play(AnimationGroup(Create(bet_line), Write(bet), lag_ratio=0.5, run_time=1))
+        
+        self.wait(3)
+        left_fifty = Tex("50\%", color=WHITE, font_size=24).move_to(check_line.get_center() + 0.25*UP + 0.25 * LEFT)
+        right_fifty = Tex("50\%", color=WHITE, font_size=24).move_to(bet_line.get_center() + 0.25 *UP + 0.25 * RIGHT)
+        self.play(Write(left_fifty), Write(right_fifty))
+        self.wait(1)
+        
+        # self.play(bet_line.animate.set_stroke_width(7), bet.animate.set_font_size(45))
+        unknown = ImageMobject('../assets/unknown.png').shift(UP).scale(0.6)
+        question_text_left = Tex("?", font_size=30).move_to(left_fifty.get_center()).set_opacity(0.3)
+        question_text_right = Tex("?", font_size=30).move_to(right_fifty.get_center())
+
+
+        bet_underlined = Underline(bet)
+        bet_underlined.set_stroke(width=2)
+        self.play(VGroup(check_line, check, left_fifty).animate.set_opacity(0.3), king.animate.set_fill_opacity(0.3), 
+        self.camera.frame.animate.move_to(bet.get_center()).set(width=10), FadeIn(unknown), 
+        # Transform(left_fifty, question_text_left), Transform(right_fifty, question_text_right),
+        Write(bet_underlined)
+        )
+        
+        self.wait(2)
+        
+
+        call = Tex("Call", color=WHITE, font_size=34).move_to(bet.get_center()+ LEFT +1.3*DOWN)
+        fold = Tex("Fold", color=WHITE, font_size=34).move_to(bet.get_center()+ RIGHT + 1.3*DOWN)
+        
+        call_line = Line(bet.get_center() + 0.1 * DOWN, call.get_center(), color=WHITE, buff=0.4)
+        fold_line = Line(bet.get_center() + 0.1 * DOWN, fold.get_center(), color=WHITE, buff=0.4)
+        new_left_fifty = Tex("50\%", color=WHITE, font_size=24).move_to(call_line.get_center() + 0.25*UP + 0.25 * LEFT)
+        new_right_fifty = Tex("50\%", color=WHITE, font_size=24).move_to(fold_line.get_center() + 0.25 *UP + 0.25 * RIGHT)
+        self.play(AnimationGroup(Create(call_line), Write(new_left_fifty), Write(call), lag_ratio=0.5, run_time=1))
+        self.wait(0.3)
+        self.play(AnimationGroup(Create(fold_line), Write(new_right_fifty), Write(fold), lag_ratio=0.5, run_time=1))
+
+        
+        self.wait(1)
+        
+        # self.play(bet_line.animate.set_stroke_width(7), bet.animate.set_font_size(45))
+        call_underlined = Underline(call)
+        call_underlined.set_stroke(width=2)
+        
+        bet_underlined.save_state()
+        self.play(VGroup(new_right_fifty, fold, fold_line).animate.set_opacity(0.3),
+        Write(call_underlined),
+        Uncreate(bet_underlined),
+        self.camera.frame.animate.move_to(call.get_center()).set(width=10)
+        )
+        self.wait(2)
+        
+        queen = ImageMobject('../assets/Qc.png').move_to(king.get_center() + 3 *UP).scale(0.6)
+        qkline = Line(queen.get_center(), king.get_center(), color=WHITE, buff=1)
+        
+        opponent = Text("OPPONENT", color=WHITE, font_size=34).move_to(queen.get_center() + 2.5*LEFT)
+        you = Text("YOU", color=WHITE, font_size=34).move_to(king.get_center() + 2*LEFT)
+
+        self.play(self.camera.frame.animate.move_to(qkline.get_center()).set_width(13), FadeIn(queen, qkline, you, opponent), FadeOut(unknown))
+        self.wait(5)
+        
+        lose_1 = Tex("(-2)", color=WHITE, font_size=34).move_to(call.get_center()+0.5*DOWN)
+        lose_2 = Tex("(-1)", color=WHITE, font_size=34).move_to(fold.get_center()+0.5*DOWN)
+        
+        self.add(lose_1)
+        self.play(self.camera.frame.animate.move_to(bet.get_center() + DOWN).set(width=11))
+        self.wait(1)
+        
+        fold_underlined = Underline(fold)
+        fold_underlined.set_stroke(width=2)
+
+        self.play(VGroup(call_line, call, new_left_fifty, lose_1).animate.set_opacity(0.3), VGroup(fold_line, fold, new_right_fifty).animate.set_opacity(1), 
+        Uncreate(call_underlined),
+        Write(fold_underlined),
+        )
+        self.wait(1)
+        self.play(Write(lose_2))
+        self.wait(2)
+        
+        
+        # --- Update to new CFR values ---
+        new_new_left_fifty = Tex("33\%", color=WHITE, font_size=24).move_to(call_line.get_center() + 0.25*UP + 0.25 * LEFT).set_opacity(0.3)
+        new_new_right_fifty = Tex("67\%", color=WHITE, font_size=24).move_to(fold_line.get_center() + 0.25 *UP + 0.25 * RIGHT)
+        
+        self.play(AnimationGroup(Transform(new_left_fifty, new_new_left_fifty), Transform(new_right_fifty, new_new_right_fifty), run_time=1))
+
+        
+        
+        bet_underlined.restore()
+        self.wait(2)
+        self.play(Uncreate(fold_underlined),VGroup(new_right_fifty, fold_line, fold, lose_2).animate.set_opacity(0.3), Create(bet_underlined))
+        self.play(VGroup(bet, bet_line, right_fifty).animate.set_opacity(0.3), Uncreate(bet_underlined),
+        )
+
+        check_underlined = Underline(check)
+        check_underlined.set_stroke(width=2)
+        self.play(Write(check_underlined), VGroup(check, check_line, left_fifty).animate.set_opacity(1),
+       self.camera.frame.animate.move_to(check.get_center() + DOWN)
+        
+        )
+        
+        
+        
+        
+        
+        
+
+        
+        bet2 = Tex("Bet", color=WHITE, font_size=34).move_to(check.get_center()+ LEFT +1.3*DOWN)
+        check2 = Tex("Check", color=WHITE, font_size=34).move_to(check.get_center()+ 0.8 * RIGHT +1.3*DOWN)
+        
+        bet2_line = Line(check.get_center() + 0.1 * DOWN, bet2.get_center(), color=WHITE, buff=0.4)
+        check2_line = Line(check.get_center() + 0.1 * DOWN, check2.get_center(), color=WHITE, buff=0.4)
+        
+        call2 = Tex("Call", color=WHITE, font_size=34).move_to(bet2.get_center()+ LEFT +1.5*DOWN)
+        fold2 = Tex("Fold", color=WHITE, font_size=34).move_to(bet2.get_center()+ RIGHT +1.5*DOWN)
+        
+        call2_line = Line(bet2.get_center() + 0.1 * DOWN, call2.get_center(), color=WHITE, buff=0.4)
+        fold2_line = Line(bet2.get_center() + 0.1 * DOWN, fold2.get_center(), color=WHITE, buff=0.4)
+        
+        
+        self.play(Create(bet2_line), Write(bet2), Create(check2_line), Write(check2))
+        self.play(Create(call2_line), Write(call2), Create(fold2_line), Write(fold2))
+        self.play(FadeOut(left_fifty, right_fifty, new_left_fifty, new_right_fifty, lose_1, lose_2),
+            VGroup(bet, bet_line, fold, fold_line).animate.set_opacity(1),
+            Uncreate(check_underlined),
+        
+        )
+        
+        
+        
+        self.wait(2)
+        
+        king_group = VGroup(check, check_line, bet, bet_line, call, call_line, check2, check2_line, bet2, bet2_line, call2, call2_line, fold, fold_line, fold2, fold2_line, qkline)
+        
+        ace_group = king_group.copy().move_to(king_group.get_center() + 6 * LEFT)
+        queen_group = king_group.copy().move_to(king_group.get_center() + 6 * RIGHT)
+        
+        ace_card = ImageMobject('../assets/Ac.png').shift(6*LEFT + UP).scale(0.6)
+        queen_card = ImageMobject('../assets/Qc.png').shift(6*RIGHT + UP).scale(0.6)
+
+        unknown.move_to(queen.get_center())
+        unknown_ace = unknown.copy().shift(6*LEFT)
+        unknown_queen = unknown.copy().shift(6*RIGHT)
+        unknown_king = unknown.copy()
+        
+        opponent.move_to(unknown_ace.get_center() + 2.5*LEFT)
+        you.move_to(ace_card.get_center() + 2*LEFT)
+        
+        line_misc = Line(unknown_king.get_center(), ace_card.get_center(), color=WHITE, buff=1)
+
+        self.play(self.camera.frame.animate.set(width=23).move_to(king_group.get_center()),
+        FadeIn(ace_group, queen_group, ace_card, queen_card, unknown_ace, unknown_queen, unknown_king),
+        
+        
+        )
+        
+
+        
+
+
+        
+        
+        
+        
+        
+
+
+class CFRScene(Scene):
+    """
+    Explain CFR using Kuhn Poker
+    ['1', '?'] {'p': 0.6706351182714639, 'b': 0.3293648817285361}
+    ['?', '3', 'p'] {'p': 0.999997996409566, 'b': 2.0035904340578316e-06}
+    ['1', '?', 'p', 'b'] {'p': 1.4911118920247454e-06, 'b': 0.9999985088881079}
+    ['?', '3', 'b'] {'p': 2.0035904340578316e-06, 'b': 0.999997996409566}
+    ['?', '2', 'p'] {'p': 0.9999980011273641, 'b': 1.9988726358333898e-06}
+    ['?', '2', 'b'] {'p': 0.6637515887115898, 'b': 0.3362484112884102}
+    ['3', '?'] {'p': 2.0019138296211177e-06, 'b': 0.9999979980861704}
+    ['3', '?', 'p', 'b'] {'p': 0.5, 'b': 0.5}
+    ['2', '?'] {'p': 0.9999867125964585, 'b': 1.3287403541442714e-05}
+    ['?', '1', 'p'] {'p': 1.9975470122689336e-06, 'b': 0.9999980024529878}
+    ['2', '?', 'p', 'b'] {'p': 0.9999990009338271, 'b': 9.990661728482387e-07}
+    ['?', '1', 'b'] {'p': 0.9999980024529878, 'b': 1.9975470122689336e-06}
+    """
+    def construct(self):
+        """
+        
+        Steps: 
+        1. Build the entire game tree
+        2. Add the information sets
+        
+        """
+        cfr = ManimCFR(create_infoSet, create_history, iterations=100, tracker_interval=10)
+        terminal_histories = cfr.solve(method="manim", debug=False) # Get all possible rollouts and use that to build our tree
+        tracker = cfr.tracker
+        
+        
+        # From player 1 POV
+        node_positions: Dict[str, np.array] = {}
+        
+        def get_position(hist: List[Action]): # Get the node for this particular position
+            print(f"getting position for {hist}")
+            player = len(hist) % 2
+            position = (ORIGIN + 2 * UP).copy()
+            if player == 0:
+                if hist[1] == '1':
+                    position += 2 * LEFT
+                elif hist[1] == '3':
+                    position += 2* RIGHT
+            elif hist[1] == '?': 
+                position += DOWN 
+                if hist[0] == '1':
+                    positions += 2 * LEFT
+                elif hist[0] == '3':
+                    positions += 2* RIGHT
+            
+            if len(hist) > 2:
+                position += DOWN
+                if hist[2] == 'p':
+                    position += LEFT
+                else:
+                    position += RIGHT
+            
+            if len(hist) > 3:
+                position += DOWN
+                if hist[3] == 'p':
+                    position += 0.5 * LEFT
+                else:
+                    position += 0.5 * RIGHT
+            
+            if len(hist) > 4:
+                position += DOWN
+                if hist[3] == 'f':
+                    position += 0.5 * LEFT
+                else:
+                    position += 0.5 * RIGHT
+            return position
+            
+                
+        for history in terminal_histories:
+            for i in range(2,len(history.history)):
+                hist = ''.join(history.history[:i])
+                if len(hist) != 0 and hist not in node_positions:
+                    node_positions[hist] = get_position(hist)
+        
+        
+        # infoSets = tracker.tracker_hist[0]
+        # for infoSet in infoSets.values():
+        #     print(infoSet.infoSet, infoSet.get_average_strategy())
+        print(node_positions)
+        
+        for name in node_positions:
+            self.play(Create(Tex(name[-1], font_size=50).move_to(node_positions[name])))
+        # cfr.histories
+        
+
+        
+
+        
+        
 class NashEquilibriumText(Scene):
     def construct(self):
         nashEquilibrium = Tex('Nash Equilibrium',font_size=100)
