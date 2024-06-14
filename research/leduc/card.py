@@ -1,11 +1,7 @@
 class Card:
     """Inspired from pycfr card.py"""
-    SUIT_STRING = {
-        1: "s",
-        2: "h",
-        3: "d",
-        4: "c"
-    }
+
+    SUIT_STRING = {1: "s", 2: "h", 3: "d", 4: "c"}
     CARD_STRING = {
         2: "2",
         3: "3",
@@ -19,14 +15,15 @@ class Card:
         11: "J",
         12: "Q",
         13: "K",
-        14: "A"
+        14: "A",
     }
+
     def __init__(self, rank, suit):
         self.rank = rank
         self.suit = suit
 
     def __repr__(self):
-        return '{}{}'.format(self.CARD_STRING[self.rank], self.SUIT_STRING[self.suit])
+        return "{}{}".format(self.CARD_STRING[self.rank], self.SUIT_STRING[self.suit])
 
     def __eq__(self, card):
         return card.rank == self.rank
@@ -36,6 +33,3 @@ class Card:
 
     def __hash__(self):
         return hash(repr(self))
-
-
-

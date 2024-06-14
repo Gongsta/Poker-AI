@@ -5,8 +5,7 @@ Design decisions I am trying to make:
 - Should I call it node or state?  
 Ultimately node makes more sense from an intuitive level, because it is a node in the game tree. 
 You train strategies on an information set though. You should have infosets in memory, but all possible nodes in memory.
-And I 
-am a very visual person. But ultimately, each node represents a state, so the terms can be used interchangeably.
+And I  am a very visual person. But ultimately, each node represents a state, so the terms can be used interchangeably.
 
 So I don't have explicit state representation, but rather information sets can be visualized. 
 - This is also more efficient for memory right? Actually, you should use states, and optimize with States later. 
