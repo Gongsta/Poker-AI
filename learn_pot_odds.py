@@ -5,7 +5,7 @@ your pot odds. Built off the monte carlo algorithms in `abstraction.py` to calcu
 import sys
 sys.path.append('./src')
 
-from abstraction import calculate_equity, calculate_equity_distribution, calculate_face_up_equity, plot_equity_hist
+from abstraction import calculate_equity, calculate_equity_distribution, plot_equity_hist
 import fast_evaluator
 import argparse
 import random
@@ -70,12 +70,5 @@ if __name__ == "__main__":
 			equity = calculate_equity(player_cards, community_cards, n=10000) # We want this to be really accurate
 			print("River Equity: {:.2f}%".format(equity * 100))
 
-			# if len(opponent_cards) == 2:
-			# 	player_probability, opponent_probability = calculate_face_up_equity(player_cards, opponent_cards, community_cards, n=10000)
-			# 	print("\nAssuming you know your opponent's cards, You have a {:.2f}% equity".format(player_probability * 100))
-			# 	print("Your opponent has a {:.2f}% equity\n".format(opponent_probability * 100))
-			
 			print("\n")
-			
 
-			
