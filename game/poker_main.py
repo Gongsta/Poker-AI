@@ -1,15 +1,11 @@
-"""
-Nobody cares about no-limit hold'em
-"""
-
 import sys
 
 sys.path.append("../src")
+
 from environment import *
 from helper import *
 import pygame
 import argparse
-import os
 import time
 import joblib
 
@@ -31,7 +27,6 @@ GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 FPS = 60
 
-# POKER_BACKGROUND = pygame.transform.scale(pygame.image.load("assets/poker-table(OLD).jpg"), (WIDTH, HEIGHT))
 POKER_BACKGROUND = pygame.transform.scale(
     pygame.image.load("assets/poker-table.png"), (WIDTH, HEIGHT)
 )
@@ -75,11 +70,10 @@ dealer_button = pygame.transform.scale(pygame.image.load("assets/dealer_button.p
 CARD_BACK = pygame.transform.scale(pygame.image.load("../assets/back.png"), (263 / 3, 376 / 3))
 
 
-POT_FONT = pygame.font.SysFont("Roboto", 30)
-BET_BUTTON_FONT = pygame.font.SysFont("Roboto", 24)
-BET_FONT = pygame.font.SysFont("Roboto", 26)
-PLAYERS_FONT = pygame.font.SysFont("Roboto", 24)
-
+POT_FONT = pygame.font.SysFont("Roboto", 30, bold=True)
+BET_BUTTON_FONT = pygame.font.SysFont("Roboto", 24, bold=True)
+BET_FONT = pygame.font.SysFont("Roboto", 26, bold=True)
+PLAYERS_FONT = pygame.font.SysFont("Roboto", 24, bold=True)
 
 # To rescale: pygame.transform.scale(card, (width, height))
 # pygame.transform.rotate(card, degrees)
@@ -108,13 +102,11 @@ done = False
 
 cursor_counter = 0
 
-
 def load_card_image(card: Card):
     # 263 × 376
     return pygame.transform.scale(
         pygame.image.load("../assets/" + str(card) + ".png"), (263 / 3, 376 / 3)
     )
-
 
 def display_total_pot_balance(env: PokerEnvironment):
     pot_information = POT_FONT.render("Total Pot: $" + str(env.total_pot_balance), 1, WHITE)
@@ -246,18 +238,18 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
     WIN.blit(warning_text_rendered, (WIDTH - 250, HEIGHT - 120))
 
     if user_input:
-        if env.position_in_play == 0:
+        if env.position_in_play == 0 or env.play_as_AI:
             # AAfilledRoundedRect(WIN, RED, pygame.Rect(392,400, 120,50), radius=0.4)
             AAfilledRoundedRect(WIN, RED, check_rect, radius=0.4)
             AAfilledRoundedRect(WIN, RED, custom_rect, radius=0.4)
             AAfilledRoundedRect(WIN, WHITE, input_box, radius=0.4)
 
-            if "f" in env.history.actions():
+            if "f" in env.infoset.actions():
                 AAfilledRoundedRect(WIN, RED, fold_rect, radius=0.4)
                 fold_bet = BET_BUTTON_FONT.render("Fold", 1, WHITE)
                 WIN.blit(fold_bet, (fold_rect.x + 15, fold_rect.y + 7))
 
-            if "k" in env.history.actions():
+            if "k" in env.infoset.actions():
                 check_bet = BET_BUTTON_FONT.render("Check", 1, WHITE)
                 WIN.blit(check_bet, (check_rect.x + 15, check_rect.y + 7))
             else:  # TODO: Min bet size is not 0 when you are the small blind, so it should be call, not check right.
@@ -318,16 +310,20 @@ def main():
         game = 0
         game_i = 0
 
-    env: PokerEnvironment = PokerEnvironment()
-    if user_input or replay:
-        env.add_player()  # You / replay
-    else:
-        env.add_AI_player()  # Simulation player
 
-    if replay:
-        env.add_player()  # Player since we want everything to be entered manually
-    else:
-        env.add_AI_player()  # Opponent
+    env: PokerEnvironment = PokerEnvironment()
+    # if user_input or replay:
+    #     env.add_player()  # You / replay
+    # else:
+    #     env.add_AI_player()  # Simulation player
+
+    # if replay:
+    #     env.add_player()  # Player since we want everything to be entered manually
+    # else:
+    #     env.add_AI_player()  # Opponent
+    # play as the AI
+    env.add_AI_player()
+    env.add_player() # play as the opponent too
 
     clock = pygame.time.Clock()
     run = True

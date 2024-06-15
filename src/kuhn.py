@@ -116,9 +116,9 @@ class KuhnInfoSet(base.InfoSet):
 
     """
 
-    def __init__(self, infoSet: List[Action], actions: List[Action], player: Player):
+    def __init__(self, infoSet_key: List[Action], actions: List[Action], player: Player):
         assert len(infoSet) >= 2
-        super().__init__(infoSet, actions, player)
+        super().__init__(infoSet_key, actions, player)
 
 
 def create_infoSet(infoSet_key: List[Action], actions: List[Action], player: Player):

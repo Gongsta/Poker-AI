@@ -2,6 +2,15 @@
 from evaluator import *
 from typing import List
 from holdem import HoldEmHistory, HoldemInfoSet  # To get the legal actions
+from abstraction import predict_cluster_fast
+import joblib
+
+
+def load_holdem_infosets():
+    print("loading holdem infosets")
+    global holdem_infosets
+    holdem_infosets = joblib.load("../src/infoSets_300.joblib")
+    print("loaded holdem infosets!")
 
 
 class Player:  # This is the POV
@@ -26,29 +35,26 @@ class Player:  # This is the POV
         self.hand = []
 
     def place_bet(self, action: str, observed_env) -> int:
-        hist: HoldEmHistory = observed_env.history
-        legal_actions = hist.actions()
-        if action not in legal_actions:
+
+        legal_actions = observed_env.infoset.actions()
+        print("here are your legal actions that the AI can react to", legal_actions)
+        # make action to nearest number
+        # ----- BET ABSTRACTION ------
+        if action[0] == "b":
+            closest_action = legal_actions[-1]
+            for legal_action in legal_actions:
+                if int(action[1:]) < int(legal_action[1:]):
+                    closest_action = legal_action
+                    break
+        else:
+            closest_action = action
+
+        if closest_action not in legal_actions:
             raise Exception(f"Invalid Action: {action}")
 
-        current_game_stage_history, stage = hist.get_current_game_stage_history()
+        print("closest bet found", closest_action)
 
-        if action == "k":  # check
-            if stage == "preflop":
-                self.current_bet = 2  # BB
-            else:
-                self.current_bet = 0
-
-        elif action == "c":
-            # If you call on the preflop
-            if len(hist.history) == 2:
-                self.current_bet = 2
-            else:
-                self.current_bet = int(hist.history[-1][1:])
-
-        elif action[0] == "b":  # bet X amount
-            self.current_bet = int(action[1:])
-        return action
+        return closest_action
 
     def calculate_pot_odds(
         self,
@@ -56,6 +62,13 @@ class Player:  # This is the POV
         """
         Simple logic, does not account for the pot values.
         """
+
+
+import numpy as np
+
+
+def getAction(strategy):
+    return np.random.choice(strategy.keys(), p=strategy.values())
 
 
 class AIPlayer(Player):
@@ -67,27 +80,27 @@ class AIPlayer(Player):
     def place_bet(self, observed_env) -> int:  # AI will call every time
         # Very similar function to Player.place_bet, we only call and check
         action = "k"
-        hist: HoldEmHistory = observed_env.history
-        legal_actions = hist.actions()
-        if action not in legal_actions:
-            action = "c"
+        strategy = observed_env.infoset.get_average_strategy()
+        action = getAction(strategy)
+        print("AI strategy", strategy)
+        print("AI action", action)
 
-        if action not in legal_actions:
-            raise Exception("AI found no legal actions", hist.actions())
-
-        current_game_stage_history, stage = hist.get_current_game_stage_history()
         if action == "k":  # check
-            if stage == "preflop":
+            if observed_env.game_stage == 2:
                 self.current_bet = 2
             else:
                 self.current_bet = 0
 
         elif action == "c":
             # If you call on the preflop
-            if len(hist.history) == 2:
+            if observed_env.game_stage == 2:
                 self.current_bet = observed_env.big_blind
             else:  # Set the current bet to the amount of the last bet
-                self.current_bet = int(hist.history[-1][1:])
+                self.current_bet = observed_env.players[
+                    (observed_env.position_in_play + 1) % 2
+                ].current_bet
+        else:
+            self.current_bet = int(action[1:])
 
         return action
 
@@ -101,16 +114,20 @@ class PokerEnvironment:
         self.players: List[Player] = []
         self.deck = Deck()
 
+        load_holdem_infosets()
+
         """Game Stages:
 		1: Starting a new round, giving players their cards. Automatically goes into state 2
 		2: Preflop betting round. Goes into state 3 once everyone has made their decision
-		3: Flop round. Goes into turn (state 4) /ends round (state 6) once everyone " " 
-		4: Turn round. Goes into river (state 5) /ends round (state 6) once everyone " " 
-		5: River round. Ends round (state 6) once everyone " " 
+		3: Flop round. Goes into turn (state 4) /ends round (state 6) once everyone " "
+		4: Turn round. Goes into river (state 5) /ends round (state 6) once everyone " "
+		5: River round. Ends round (state 6) once everyone " "
 		6: Round is over. Distribute pot winnings.
-		
+
 		Game Stage - 2 = number of "/" in the holdem infoset and history
 		"""
+        self.play_as_AI = True  # play as the AI (used in video)
+
         self.game_stage = 1  # To keep track of which phase of the game we are at, new_round is 0
         # If self.finished_playing_game_stage = True, we can move to the next game state. This is needed to go around each player and await their decision
         self.finished_playing_game_stage = False
@@ -128,9 +145,10 @@ class PokerEnvironment:
         self.new_player_balance = 100
         self.small_blind = 1
         self.big_blind = 2
-        self.history: HoldEmHistory = (
-            HoldEmHistory()
-        )  # THis will be the history that will be fed into the AI
+        # holdem infosets
+        # use the infosets for the AI to make predictions
+        self.infoSet_key = []
+        self.infoset = None
 
         self.players_balance_history = []  # List of "n" list for "n" players
 
@@ -142,6 +160,7 @@ class PokerEnvironment:
 
     def add_AI_player(self):  # Add a dumb AI
         self.players.append(AIPlayer(self.new_player_balance))
+        self.AI_player_idx = len(self.players) - 1
 
     def get_winning_players(self) -> List:
         # If there is more than one winning player, the pot is split. We assume that we only run things once
@@ -214,8 +233,6 @@ class PokerEnvironment:
         self.stage_pot_balance = 0
         self.total_pot_balance = 0
 
-        self.history = HoldEmHistory()  # Reset the history
-
         # Move the dealer position and assign the new small and big blinds
         self.dealer_button_position += 1
         self.dealer_button_position %= len(self.players)
@@ -238,12 +255,15 @@ class PokerEnvironment:
         for _ in range(len(self.players)):
             position_to_deal %= len(self.players)
             card_str = ""
-            for _ in range(2):
-                card = self.deck.draw()
+            for i in range(2):
+                if self.play_as_AI and self.players[position_to_deal].is_AI:
+                    card = Card(input(f"Enter the {i}-th card that was dealt to the AI (ex: Ah): "))
+                else:
+                    card = self.deck.draw()
+
                 card_str += str(card)
                 self.players[position_to_deal].add_card_to_hand(card)
 
-            self.history += card_str
             position_to_deal += 1
 
         self.finished_playing_game_stage = True
@@ -251,7 +271,6 @@ class PokerEnvironment:
     def update_stage_pot_balance(self):
         """
         Assumes the balances from the players are correct
-
         """
         self.stage_pot_balance = 0
         for player in self.players:
@@ -263,7 +282,9 @@ class PokerEnvironment:
             action = self.players[self.position_in_play].place_bet(
                 self
             )  # Pass the Environment as an argument
-            self.history += action
+
+            self.infoSet_key += [action]
+            self.infoset = holdem_infosets["".join(self.infoSet_key)]
 
         else:  # Real player's turn
             if action == "":  # No decision has yet been made
@@ -315,18 +336,47 @@ class PokerEnvironment:
 
         self.finished_playing_game_stage = False
 
+        # Assign to cluster
+
+        if self.position_in_play != self.AI_player_idx:  # AI doesn't know what the opponent has
+            self.infoSet_key += ["?"]
+            self.infoSet_key += [
+                predict_cluster_fast(
+                    [str(card) for card in self.players[self.AI_player_idx].hand],
+                    n=3000,
+                    total_clusters=20,
+                )
+            ]
+        else:
+            self.infoSet_key += [
+                predict_cluster_fast(
+                    [str(card) for card in self.players[self.AI_player_idx].hand],
+                    n=3000,
+                    total_clusters=20,
+                )
+            ]
+            self.infoSet_key += ["?"]
+
+        self.infoset = holdem_infosets["".join(self.infoSet_key)]
+
     def play_flop(self):
         # 3. Flop
-        self.history += "/"
+        self.infoSet_key += ["/"]
 
         self.deck.draw()  # We must first burn one card, TODO: Show on video
 
-        cards = ""
-        for _ in range(3):  # Draw 3 cards
-            self.community_cards.append(self.deck.draw())
-            cards += str(self.community_cards[-1])
+        for i in range(3):  # Draw 3 cards
+            if self.play_as_AI:
+                card = Card(input(f"Input the {i}-th community card (ex: 'Ah'): "))
+            else:
+                card = self.deck.draw()
 
-        self.history += cards
+            self.community_cards.append(card)
+
+        cards = [str(card) for card in self.community_cards]
+
+        self.infoSet_key += [predict_cluster_fast(cards, n=1000, total_clusters=10)]
+        self.infoset = holdem_infosets["".join(self.infoSet_key)]
 
         # The person that should play is the first person after the dealer position
         self.position_in_play = self.dealer_button_position
@@ -337,12 +387,18 @@ class PokerEnvironment:
 
     def play_turn(self):
         # 4. Turn
-        self.history += "/"
+        self.infoSet_key += ["/"]
 
         self.deck.draw()  # We must first burn one card, TODO: Show on video
-        self.community_cards.append(self.deck.draw())
+        if self.play_as_AI:
+            card = Card(input("Input the turn card (ex: '5d'): "))
+        else:
+            card = self.deck.draw()
 
-        self.history += str(self.community_cards[-1])
+        self.community_cards.append(card)
+        cards = [str(card) for card in self.community_cards]
+        self.infoSet_key += [predict_cluster_fast(cards, n=500, total_clusters=5)]
+        self.infoset = holdem_infosets["".join(self.infoSet_key)]
 
         # The person that should play is the first person after the dealer position
         self.position_in_play = self.dealer_button_position
@@ -353,12 +409,18 @@ class PokerEnvironment:
 
     def play_river(self):
         # 5. River
-        self.history += "/"
+        self.infoSet_key += ["/"]
 
         self.deck.draw()  # We must first burn one card, TODO: Show on video
-        self.community_cards.append(self.deck.draw())
+        if self.play_as_AI:
+            card = input("Input the river card (ex: '5d'): ")
+        else:
+            card = self.deck.draw()
 
-        self.history += str(self.community_cards[-1])
+        self.community_cards.append(card)
+        cards = [str(card) for card in self.community_cards]
+        self.infoSet_key += [predict_cluster_fast(cards, n=200, total_clusters=5)]
+        self.infoset = holdem_infosets["".join(self.infoSet_key)]
 
         self.finished_playing_game_stage = False
 
@@ -413,11 +475,14 @@ class PokerEnvironment:
                 self.finished_playing_game_stage = (
                     False  # on the next call of the handler, we will start a new round
                 )
+
+            print(self.infoSet_key)
         else:
             if self.game_stage == 1:
                 # This function was put here instead of at game_stage == 6 to visualize the game
                 self.distribute_pot_to_winning_players()
                 self.start_new_round()
+                self.handle_game_stage()
             else:
                 self.play_current_stage(action)
 

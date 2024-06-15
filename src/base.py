@@ -100,8 +100,8 @@ class InfoSet:
 
     """
 
-    def __init__(self, infoSet: List[Action], actions: List[Action], player: Player):
-        self.infoSet = infoSet
+    def __init__(self, infoSet_key: List[Action], actions: List[Action], player: Player):
+        self.infoSet = infoSet_key
         self.__actions = actions
         self.__player = player
 
@@ -161,7 +161,7 @@ class CFR:
         create_history,
         n_players: int = 2,
         iterations: int = 1000000,
-        tracker_interval=50000,
+        tracker_interval=1000,
     ):
         self.n_players = n_players
         self.iterations = iterations
@@ -340,7 +340,7 @@ class CFR:
     def mccfr(
         self, history: History, i: Player, t: int, pi_0: float, pi_1: float, debug=False
     ):  # Works for two players
-        return
+        raise NotImplementedError()
 
     def solve(self, method="vanilla_speedup", debug=False):
         util_0 = 0
@@ -350,7 +350,7 @@ class CFR:
 
         for t in tqdm(range(self.iterations), desc="CFR Training Loop"):
             if method == "vanilla_speedup":
-                util_0 += self.vanilla_cfr_speedup(self.create_history(), t, 1, 1, debug=debug)
+                util_0 += self.vanilla_cfr_speedup(self.create_history(t), t, 1, 1, debug=debug)
 
             elif method == "manim" and t < 10:
                 for player in range(self.n_players):
@@ -384,11 +384,14 @@ class CFR:
                 self.tracker(self.infoSets)
                 self.tracker.pprint()
 
+            if t % 2500 == 0:
+                self.export_infoSets(f"infoSets_{t}.joblib")
+
         if method == "manim":
             return histories
 
-    def export_infoSets(self):
-        joblib.dump(self.infoSets, "holdem_infoSets.joblib")
+    def export_infoSets(self, filename = "infoSets.joblib"):
+        joblib.dump(self.infoSets, filename)
 
     def get_expected_value(
         self, history: History, player: Player, player_strategy=None, opp_strategy=None
@@ -479,7 +482,6 @@ class CFR:
 		The algorithm is the following:
 		1. For each action that the opponent can play after our decision, we see what happens if our opponent sticks to that strategy.
 		Whatever action our opponent chooses that minimizes our expected value is the one.
-		
 		"""
         sample_a = infoSet.actions()[0]
         sample_opp_history = (
