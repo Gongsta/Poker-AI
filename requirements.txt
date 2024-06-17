@@ -5,7 +5,5 @@ joblib # parallel computation and store models
 phevaluator # fast poker hand evaluator using string representation of cards
 torch
 matplotlib
-pot # Not really needed, I found it to be too slow
 scikit-learn
-labml
-
+py3-tts

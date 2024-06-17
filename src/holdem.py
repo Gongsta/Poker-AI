@@ -1,3 +1,6 @@
+"""
+Abstracted version of Holdem Poker, used for training.
+"""
 import base
 import numpy as np
 from base import Player, Action
@@ -632,8 +635,12 @@ if __name__ == "__main__":
     # generate_dataset()
     load_dataset()
     cfr = HoldemCFR(create_infoSet, create_history)
-    # cfr.infoSets = joblib.load("infosets.joblib")
+    # cfr.infoSets = joblib.load("infoSets_2500.joblib")
+    # print("finished loading")
     cfr.solve()
+    # cfr.solve_multiprocess(
+    #     initializer=load_dataset,
+    # )
 
 #     """
 # 	When we work with these abstractions, we have two types:

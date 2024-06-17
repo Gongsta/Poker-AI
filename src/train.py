@@ -3,7 +3,7 @@ Before looking at this code, you should probably familiarize with a simpler impl
 of CFR with Kuhn Poker, under `research/kuhn/train.py`. That version of the game 
 does not implement Card Abstraction. This version does.
 
-This is the main training file for Poker CFR. It generates a blueprint strategy. Then, we will improve
+TOO SLOW This is the main training file for Poker CFR. It generates a blueprint strategy. Then, we will improve
 it in real-time by implementing depth-limited solving.
 """
 

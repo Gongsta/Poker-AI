@@ -1,29 +1,7 @@
-# Uses Cactus Kev’s 5-Card Evaluator: http://suffe.cool/poker/evaluator.html
-# I am aware that this method is not the most efficient, I will look into implementations if needed
-
-# https://www.codingthewheel.com/archives/poker-hand-evaluator-roundup
-
 """
-# Some thoughts, the evaluator is going to be important because it determines the rules
-# of the game. However, we won't give our AI this. The environment will simply 
-# feed the final reward, which is win or not win. 
-
-# Reward = the amount of money you win or lose. 
-# The optimal policy probably has to be probabilistic, actually no... maybe 
-because the opponent will start figuring it out and calling / folding every time. 
-
-Also, what kind of opponents do we want to be playing? 
-
-Card representation also needs to be fast. Everything needs to be fast, for the AI
-to run lots of simulations and figure out the optimal strategy. 
-
-# I think I will consider two approaches
-- Card Kev's which is a 5-card lookup table, will need to do lookup 21 times...
-- Two + Two algorithm which is for a 7-card lookup table
-https://github.com/chenosaurus/poker-evaluator/
-
-Speed is pretty important, since I want to train the AI as fast as possible, so that it learns the optimal 
-policy. If the game is slow, then there is no point. 
+A custom evaluator implemented using bit representation for cards to evaluate hands for Texas Hold'Em Poker.
+Note that this is still slow compared to other open-source implementations, so I only use this for running the main
+game (see `poker_main.py`).
 """
 
 # Representation is key to performance. This is going to be terrifying, as I am going to be working with bits..
@@ -511,6 +489,7 @@ class Evaluator:
         hand_strengths = [hand.hand_strength for hand in self.hands]
         best_hand_val = min(hand_strengths)
         potential_winners = [i for i, x in enumerate(hand_strengths) if x == best_hand_val]
+        print(potential_winners)
 
         # TODO: Idea to optimize in the future, just make the best hand as a list, and then compare if necessary.
 
