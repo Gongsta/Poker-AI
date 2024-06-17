@@ -1,7 +1,9 @@
 # The Poker Environment
 from evaluator import *
 from typing import List
-from player import Player, AIPlayer
+from player import Player
+from aiplayer import AIPlayer
+
 
 class PokerEnvironment:
     """
@@ -40,7 +42,7 @@ class PokerEnvironment:
         self.SMALL_BLIND = 1
         self.BIG_BLIND = 2
 
-        self.INPUT_CARDS = False
+        self.INPUT_CARDS = True
 
         self.history = []
         self.players_balance_history = []  # List of "n" list for "n" players
@@ -117,6 +119,7 @@ class PokerEnvironment:
     def start_new_round(self):
         assert len(self.players) >= 2  # We cannot start a poker round with less than 2 players...
 
+        self.new_player_balance = int(input("Enter the starting balance for the players: "))
         # Reset Players
         for player in self.players:
             player.playing_current_round = True

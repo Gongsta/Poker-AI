@@ -236,7 +236,7 @@ def create_abstraction_folders():
                 os.makedirs(f"../data/{split}/{stage}")
 
 
-def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=False):
+def calculate_equity(player_cards: List[str], community_cards=[], n=2000, timer=False):
     if timer:
         start_time = time.time()
     wins = 0
@@ -254,7 +254,8 @@ def calculate_equity(player_cards: List[str], community_cards=[], n=1000, timer=
         if player_score < opponent_score:
             wins += 1
         elif player_score == opponent_score:
-            wins += 0.5
+            wins += 1
+            # wins += 0.5
 
     if timer:
         print("Time it takes to call function: {}s".format(time.time() - start_time))

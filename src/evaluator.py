@@ -489,7 +489,6 @@ class Evaluator:
         hand_strengths = [hand.hand_strength for hand in self.hands]
         best_hand_val = min(hand_strengths)
         potential_winners = [i for i, x in enumerate(hand_strengths) if x == best_hand_val]
-        print(potential_winners)
 
         # TODO: Idea to optimize in the future, just make the best hand as a list, and then compare if necessary.
 
