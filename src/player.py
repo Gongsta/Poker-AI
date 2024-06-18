@@ -1,6 +1,3 @@
-import joblib
-import pyttsx3
-import numpy as np
 from evaluator import *
 from typing import List
 
@@ -44,69 +41,3 @@ class Player:  # This is the POV
                 self.current_bet = int(action[1:])
 
         return action
-
-
-def getAction(strategy):
-    return np.random.choice(list(strategy.keys()), p=list(strategy.values()))
-
-
-class AIPlayer(Player):
-    def __init__(self, balance) -> None:
-        super().__init__(balance)
-        self.is_AI = True
-
-        self.engine = pyttsx3.init()
-
-    # We are going to have the dumbest AI possible, which is to call every time
-    def place_bet(self, observed_env) -> int:  # AI will call every time
-        print(observed_env)
-        # Very similar function to Player.place_bet, we only call and check
-        # use the the history
-        # strategy = observed_env.get_average_strategy()
-        if "k" in observed_env.valid_actions():
-            action = "k"
-        else:
-            action = "c"
-
-        print(observed_env.history)
-
-        # action = getAction(strategy)
-        # print("AI strategy", strategy)
-        # print("AI action", action)
-
-        if action == "k":  # check
-            if observed_env.game_stage == 2:
-                self.current_bet = 2
-            else:
-                self.current_bet = 0
-
-            self.engine.say("I Check")
-        elif action == "c":
-            self.engine.say("I Call")
-            # If you call on the preflop
-            self.current_bet = observed_env.get_highest_current_bet()
-        elif action == "f":
-            self.engine.say("I Fold")
-        else:
-            self.current_bet = int(action[1:])
-            self.engine.say(f"I bet {self.current_bet * 100}")
-
-        self.engine.runAndWait()
-        return action
-
-
-def load_holdem_infosets():
-    print("loading holdem infosets")
-    global holdem_infosets
-    # holdem_infosets = joblib.load("../src/infoSets_100.joblib")
-    holdem_infosets = joblib.load("../src/infoSets_0.joblib")
-    print("loaded holdem infosets!")
-
-
-def get_infoset(infoSet_key):
-    print("getting infoset", infoSet_key)
-    key = "".join(infoSet_key)
-    if key in holdem_infosets:
-        return holdem_infosets[key]
-    else:
-        return None

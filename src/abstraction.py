@@ -429,7 +429,7 @@ def get_filenames(folder, extension=".npy"):
     return filenames
 
 
-def predict_cluster(kmeans_classifier, cards, n=200):
+def predict_cluster_kmeans(kmeans_classifier, cards, n=200):
     """cards is a list of cards"""
     print(cards)
     equity_distribution = calculate_equity_distribution(cards[:2], cards[2:], n=n)
@@ -444,13 +444,13 @@ def predict_cluster(kmeans_classifier, cards, n=200):
         + 0.9 * equity_distribution[4],
     )
     print(equity)
-    # y = kmeans_classifier.predict([equity_distribution])
-    # assert len(y) == 1
-    # return y[0]
+    y = kmeans_classifier.predict([equity_distribution])
+    assert len(y) == 1
+    return y[0]
 
 
-def predict_cluster_fast(cards, n=1000, total_clusters=10):
-    equity = calculate_equity(cards[:2], cards[2:], n=1000)
+def predict_cluster_fast(cards, n=2000, total_clusters=10):
+    equity = calculate_equity(cards[:2], cards[2:], n=n)
     cluster = min(total_clusters - 1, int(equity * total_clusters))
     return cluster
 

@@ -1,4 +1,4 @@
-import joblib
+import random
 import pyttsx3
 import numpy as np
 from player import Player
@@ -16,9 +16,66 @@ class AIPlayer(Player):
 
         self.engine = pyttsx3.init()
 
-    # We are going to have the dumbest AI possible, which is to call every time
+    def get_trash_talk(self, action_type, bet_amount=0):
+        trash_talk = {
+            "k": [
+                "I Check. Don't get too excited now.",
+                "Check. Let's see what you've got.",
+                "I'll check. Not impressed yet.",
+            ],
+            "c": [
+                "I Call. You think you're tough?",
+                "Call. Let's see what you're hiding.",
+                "I call your bet. Bring it on!",
+            ],
+            "f": [
+                "I Fold. You win this one.",
+                "Fold. Consider yourself lucky.",
+                "I'm folding. Don't get used to it.",
+            ],
+            "all_in": [
+                "I'm All-In! What are you gonna do, young man?",
+                "All-In! Show me what you got!",
+                "I'm going All-In! Can you handle it?",
+            ],
+            "b": [
+                f"I bet {bet_amount}$. Do you have the guts?",
+                f"Bet {bet_amount}$. Let's up the stakes!",
+                f"I'm betting {bet_amount}$. Feeling lucky?",
+            ],
+            "win": [
+                "I win! Better luck next time.",
+                "Victory is sweet. Did you even stand a chance?",
+                "I told you, I'm the best. Pay up!",
+            ],
+            "lose": [
+                "You win this time. Don't get used to it.",
+                "Lucky break. Enjoy it while it lasts.",
+                "You got me this time. It won't happen again.",
+            ],
+            "opponent_fold": [
+                "Hah! Folding already? Pathetic.",
+                "You're folding? I expected more fight from you.",
+                "Fold? I knew you couldn't handle the pressure.",
+            ],
+        }
+        return trash_talk[action_type]
+
+    def trash_talk_win(self):
+        self.engine.say(random.choice(self.get_trash_talk("win")))
+        self.engine.runAndWait()
+
+    def trash_talk_lose(self):
+        self.engine.say(random.choice(self.get_trash_talk("lose")))
+        self.engine.runAndWait()
+
+    def trash_talk_fold(self):
+        self.engine.say(random.choice(self.get_trash_talk("opponent_fold")))
+        self.engine.runAndWait()
+
     def place_bet(self, observed_env) -> int:  # AI will call every time
-        # strategy = observed_env.get_average_strategy()
+
+        # Strategy with Heuristic
         if "k" in observed_env.valid_actions():
             action = "k"
         else:
@@ -39,7 +96,7 @@ class AIPlayer(Player):
             ):  # If you are the dealer, raise more of the time
                 strategy = {
                     "k": np_strategy[0],
-                    f"b{min(observed_env.BIG_BLIND, self.player_balance)}": np_strategy[2],
+                    f"b{min(max(observed_env.BIG_BLIND, int(observed_env.total_pot_balance / 3)), self.player_balance)}": np_strategy[2],
                     f"b{min(observed_env.total_pot_balance, self.player_balance)}": np_strategy[1],
                 }
             else:
@@ -49,7 +106,7 @@ class AIPlayer(Player):
                 }
 
         else:  # if there is a bet already
-            # TODO: calculate proportional to bet size
+            # TODO: calculate proportional to bet size. i mean, it just does it according to bet size
             # normalize the strategy
             if "k" in observed_env.valid_actions():
                 strategy = {
@@ -62,13 +119,19 @@ class AIPlayer(Player):
                     ],
                 }
             else:
-                strategy = {
-                    "f": np_strategy[0],
-                    "c": np_strategy[1],
-                    f"b{min(2 * observed_env.get_highest_current_bet(), self.player_balance)}": np_strategy[
-                        2
-                    ],
-                }
+                if observed_env.get_highest_current_bet() == self.player_balance:
+                    strategy = {
+                        "f": np_strategy[0],
+                        "c": np_strategy[1] + np_strategy[2],
+                    }
+                else:
+                    strategy = {
+                        "f": np_strategy[0],
+                        "c": np_strategy[1],
+                        f"b{min(2 * observed_env.get_highest_current_bet(), self.player_balance)}": np_strategy[
+                            2
+                        ],
+                    }
 
         print(card_str, community_cards)
         print(observed_env.get_highest_current_bet())
@@ -90,33 +153,37 @@ class AIPlayer(Player):
 
             self.engine.say("I Check")
         elif action == "c":
-            self.engine.say("I Call")
+            if observed_env.get_highest_current_bet() == self.player_balance:
+                self.engine.say("I call your all-in. You think I'm afraid?")
+            else:
+                self.engine.say(random.choice(self.get_trash_talk("c")))
             # If you call on the preflop
             self.current_bet = observed_env.get_highest_current_bet()
         elif action == "f":
-            self.engine.say("I Fold")
+            self.engine.say(random.choice(self.get_trash_talk("f")))
         else:
             self.current_bet = int(action[1:])
             if self.current_bet == self.player_balance:
-                self.engine.say("I'm All-In! What are you gonna do young man?")
-            self.engine.say(f"I bet {self.current_bet}")
+                self.engine.say(random.choice(self.get_trash_talk("all_in")))
+            else:
+                self.engine.say(random.choice(self.get_trash_talk("b", self.current_bet)))
 
         self.engine.runAndWait()
         return action
 
 
-def load_holdem_infosets():
-    print("loading holdem infosets")
-    global holdem_infosets
-    # holdem_infosets = joblib.load("../src/infoSets_100.joblib")
-    holdem_infosets = joblib.load("../src/infoSets_0.joblib")
-    print("loaded holdem infosets!")
+# def load_holdem_infosets():
+#     print("loading holdem infosets")
+#     global holdem_infosets
+#     # holdem_infosets = joblib.load("../src/infoSets_100.joblib")
+#     holdem_infosets = joblib.load("../src/infoSets_0.joblib")
+#     print("loaded holdem infosets!")
 
 
-def get_infoset(infoSet_key):
-    print("getting infoset", infoSet_key)
-    key = "".join(infoSet_key)
-    if key in holdem_infosets:
-        return holdem_infosets[key]
-    else:
-        return None
+# def get_infoset(infoSet_key):
+#     print("getting infoset", infoSet_key)
+#     key = "".join(infoSet_key)
+#     if key in holdem_infosets:
+#         return holdem_infosets[key]
+#     else:
+#         return None

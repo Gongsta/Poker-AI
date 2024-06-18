@@ -9,10 +9,7 @@ from typing import NewType, Dict, List, Callable, cast
 import copy
 from fast_evaluator import Deck
 from abstraction import (
-    get_preflop_cluster_id,
-    predict_cluster,
     predict_cluster_fast,
-    load_kmeans_classifiers,
 )
 from fast_evaluator import phEvaluatorSetup, evaluate_cards
 import time

@@ -119,7 +119,8 @@ class PokerEnvironment:
     def start_new_round(self):
         assert len(self.players) >= 2  # We cannot start a poker round with less than 2 players...
 
-        self.new_player_balance = int(input("Enter the starting balance for the players: "))
+        if self.INPUT_CARDS:
+            self.new_player_balance = int(input("Enter the starting balance for the players: "))
         # Reset Players
         for player in self.players:
             player.playing_current_round = True
@@ -351,6 +352,20 @@ class PokerEnvironment:
 
             for winner in winners:
                 self.players[indices_of_potential_winners[winner]].playing_current_round = True
+
+            for player in self.players:
+                if player.is_AI:
+                    if player.playing_current_round:
+                        player.trash_talk_win()
+                    else:
+                        player.get_trash_lose()
+
+        else:
+            for player in self.players:
+                if player.is_AI:
+                    if player.playing_current_round:
+                        player.trash_talk_fold()
+
 
         self.game_stage = 6  # mark end of round
         self.distribute_pot_to_winning_players()

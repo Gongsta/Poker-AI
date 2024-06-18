@@ -75,14 +75,15 @@ if STRATEGY == 0:
     USERNAME = "steveng_call"
     PASSWORD = "callingstation"
 elif STRATEGY == 1:
-    USERNAME = "steveng_equity"
+    # USERNAME = "steveng_equity"
+    USERNAME = "pokerv1"
     PASSWORD = "equitybet"
 elif STRATEGY == 2:
     USERNAME = "steveng_cfr"
     PASSWORD = "cfrpleasework"
 
-if os.path.exists(f"../data/slumbot/{USERNAME}.joblib"):  # Load previous history if it exists
-    history = joblib.load(f"../data/slumbot/{USERNAME}.joblib")
+# if os.path.exists(f"../data/slumbot/{USERNAME}.joblib"):  # Load previous history if it exists
+#     history = joblib.load(f"../data/slumbot/{USERNAME}.joblib")
 
 if not os.path.exists("../data/slumbot"):
     os.makedirs("../data/slumbot")
@@ -312,10 +313,11 @@ def Act(token, action):
     return r
 
 
+from aiplayer import getAction
+import numpy as np
+
 def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
-    # a is returned by the ParseAction() function
     a = ParseAction(action)
-    # This sample program implements a naive strategy of "always check or call".
 
     if strategy == 0:  # always check or call
         if a["last_bettor"] == -1:  # no one has bet yet
@@ -323,18 +325,75 @@ def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
         else:  # opponent has bet, so simply call
             incr = "c"
     elif strategy == 1:
-        equity = calculate_equity(hole_cards, board, n=5000)
-        print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
-        if a["last_bettor"] == -1:
-            if equity >= 0.5:
-                incr = "b1000"
+    #     equity = calculate_equity(hole_cards, board, n=5000)
+    #     print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
+    #     if a["last_bettor"] == -1:
+    #         if equity >= 0.5:
+    #             incr = "b1000"
+    #         else:
+    #             incr = "k"
+    #     else:
+    #         if equity >= 0.5:
+    #             incr = "c"
+    #         else:
+    #             incr = "f"
+    # elif strategy == 3:
+        card_str = hole_cards
+        community_cards = board
+        # if observed_env.game_stage == 2:
+        equity = calculate_equity(card_str, community_cards)
+
+        # fold, check / call, raise
+        np_strategy = np.abs(np.array([1.0 - (equity + equity / 2.0), equity, equity / 2.0]))
+        np_strategy = np_strategy / np.sum(np_strategy)  # normalize
+        remaining = 20000 -  (a["total_last_bet_to"] - a["street_last_bet_to"])
+
+        if a["street_last_bet_to"] == 0:  # no bet placed
+            if a["pos"] == 1:  # If you are the dealer, raise more of the time
+                strategy = {
+                    "k": np_strategy[0],
+                    f"b{min(100, remaining)}": np_strategy[2],
+                    f"b{min(2 * a['total_last_bet_to'], remaining)}": np_strategy[1], # pot-size
+                }
             else:
-                incr = "k"
-        else:
-            if equity >= 0.5:
-                incr = "c"
+                strategy = {
+                    "k": equity,
+                    f"b{min(2 * a['total_last_bet_to'], remaining)}": 1 - equity,
+                }
+
+        else:  # if there is a bet already
+            # TODO: calculate proportional to bet size
+            # normalize the strategy
+            if a["last_bettor"] == -1:  # You can check
+                strategy = {
+                    "k": np_strategy[0],
+                    f"b{min(int(1.5 * a['street_last_bet_to']), remaining)}": np_strategy[1],
+                    f"b{min(2 *a['street_last_bet_to'], remaining)}": np_strategy[
+                        2
+                    ],
+                }
             else:
-                incr = "f"
+                if remaining ==  a["street_last_bet_to"]:
+                    strategy = {
+                        "f": np_strategy[0],
+                        "c": np_strategy[1] + np_strategy[2],
+                    }
+                else:
+                    strategy = {
+                        "f": np_strategy[0],
+                        "c": np_strategy[1],
+                        f"b{min(2 * a['street_last_bet_to'], remaining)}": np_strategy[
+                            2
+                        ],
+                    }
+
+        print(action, a)
+        print(card_str, community_cards)
+        print("equity", equity)
+        print("AI strategy ", strategy)
+        incr = getAction(strategy)
+        print("decision", incr)
+        print("")
 
     return incr
 
@@ -437,9 +496,9 @@ def main():
     for h in range(num_hands):
         (token, hand_winnings) = PlayHand(token)
         winnings += hand_winnings
-        if h % 100 == 0:
-            print(history)
-            joblib.dump(history, f"../data/slumbot/{USERNAME}.joblib")
+        # if h % 100 == 0:
+        #     print(history)
+        #     joblib.dump(history, f"../data/slumbot/{USERNAME}.joblib")
     print("Total winnings: %i" % winnings)
 
 
