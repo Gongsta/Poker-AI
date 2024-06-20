@@ -1,40 +1,35 @@
 """
-Abstracted version of Holdem Poker, used for training.
+Abstracted version of No Limit Texas Hold'Em Poker for post-flop onwards. Also see `preflop_holdem.py` for the preflop version.
 
-To make this computationally feasible to solve on my macbook, I start solving at the flop.
+I do this to make it computationally feasible to solve on my macbook.
 
 Card Abstraction
 - 10 clusters for flop
 - 10 clusters for turn
 - 10 clusters for river
 
-10^3 = 1000 clusters
+Total = 10^3 = 1000 clusters
 
-Bet abstraction (ONLY allow these 11 sequences)
-- k ("check")
-- bMIN ("bet 1/3 pot, or big blind if pot is too")
-- bMAX ("bet the pot size")
-- c ("call")
-- f ("fold")
+Bet abstraction (ONLY allow these 11 sequences), more on these below
+- kk
+- kbMINf
+- kbMINc
+- kbMAXf
+- kbMAXc
+- bMINf
+- bMINc
+- bMINbMAXf
+- bMINbMAXc
+- bMAXf
+- bMAXc
 
-kk
-kbMINf
-kbMINc
-kbPOTf
-kbPOTc
-bMINf
-bMINc
-bMINbMAXf # opponent raises on you
-bMINbMAXc # opponent raises on you
-bPOTf
-bPOTc
-
-11^3 = 1331 possible sequences (3 stages: flop, turn, river)
+we get 11^3 = 1331 possible sequences (3 betting rounds: flop, turn, river)
 
 In total, we have 1000 * 1331 = 1 331 000 information sets.
-However, i noticed that only ~10% of the information sets are actually visited, since huge transitions are not possible.
+I noticed that only ~10% of the information sets are actually visited, so
+we end up with only ~133 100 information sets.
 
-This keeps it manageable. Anything more is in orders of millions...
+This keeps it manageable for training.
 """
 
 import base
@@ -49,6 +44,9 @@ from fast_evaluator import phEvaluatorSetup, evaluate_cards
 import time
 
 DISCRETE_ACTIONS = ["k", "bMIN", "bMAX", "c", "f"]
+NUM_FLOP_CLUSTERS = 10
+NUM_TURN_CLUSTERS = 10
+NUM_RIVER_CLUSTERS = 10
 
 
 # ----- GLOBAL VARIABLES Load the pre-generated dataset -----
@@ -82,14 +80,11 @@ class PostflopHoldemHistory(base.History):
     First two actions are the cards dealt to the players. The rest of the actions are the actions taken by the players.
             1. ['AkTh', 'QdKd', '/', 'QhJdKs', 'bMIN', 'c', '/', 'Ah', 'k', 'k', ...]
 
+    Notice that there are no bets on the preflop, as this is the postflop version of the game.
+
     Infoset:
     [4, 'bMIN', 'c', '10', 'k', 'k', ...]
 
-    ---- ACTIONS ----
-    - k = check
-    - bX = bet X amount (this includes raising)
-    - c = call
-    - f = fold (you cannot fold if the other player just checked)
 
     Every round starts the same way:
     Small blind = 1 chip
@@ -125,35 +120,40 @@ class PostflopHoldemHistory(base.History):
             return False
 
     def actions(self):
+        """
+        To limit this game going to infinity, I only allow 11 betting seqeunces.
+        Else the branching factor huge.
+        - kk
+        - kbMINf
+        - kbMINc
+        - kbMAXf
+        - kbMAXc
+        - bMINf
+        - bMINc
+        - bMINbMAXf
+        - bMINbMAXc
+        - bMAXf
+        - bMAXc
+
+        where the actions are defined as:
+        - k ("check")
+        - bMIN ("bet 1/3 pot, or big blind if pot is too")
+        - bMAX ("bet the pot size")
+        - c ("call")
+        - f ("fold")
+
+        For deeper bet sequences, this can be abstracted by collapsing the betting sequence to one of the shorter 11 sequences
+        above. For example, if we raise and the opponent raises, and we raise again (ex: b100b200b300), then we treat that as simply bMAX.
+
+        bMINbMAX = kBMAX
+        """
         if self.is_chance():  # draw cards
             return (
                 []
             )  # This should return the entire deck with current cards removed, but I do this for speedup by loading an existing dataset
 
         elif not self.is_terminal():
-            """
-            To limit this game going to infinity, I only allow 11 betting seqeunces.
-            Else the branching factor huge.
 
-            kk
-            kbMINf
-            kbMINc
-            kbMAXf
-            kbMAXc
-            bMINf
-            bMINc
-            bMINbMAXf
-            bMINbMAXc
-            bMAXf
-            bMAXc
-
-            This is easy calculation. If someone raises, then treat that as bMAX.
-
-            If we raise and the opponent raises, then we treat that as bMAX. So this way, we can always
-            treat the last action as bMAX.
-
-            bMINbMAX = kBMAX
-            """
             assert (
                 not self._game_stage_ended()
             )  # game_stage_ended would mean that it is a chance node
@@ -162,7 +162,7 @@ class PostflopHoldemHistory(base.History):
                 return ["k", "bMIN", "bMAX"]
             elif self.history[-2:] == ["k", "bMIN"]:
                 return ["f", "c"]
-            elif self.history[-1] == ["bMIN"]:
+            elif self.history[-1] == "bMIN":
                 return ["bMAX", "f", "c"]
             elif self.history[-1] == "bMAX":
                 return ["f", "c"]
@@ -290,17 +290,17 @@ class PostflopHoldemHistory(base.History):
                 if stage_i == 1:
                     assert len(action) == 6
                     infoset.append(
-                        str(predict_cluster_fast(hand + community_cards, total_clusters=10))
+                        str(predict_cluster_fast(hand + community_cards, total_clusters=NUM_FLOP_CLUSTERS))
                     )
                 elif stage_i == 2:
                     assert len(action) == 2
                     infoset.append(
-                        str(predict_cluster_fast(hand + community_cards, total_clusters=5))
+                        str(predict_cluster_fast(hand + community_cards, total_clusters=NUM_TURN_CLUSTERS))
                     )
                 elif stage_i == 3:
                     assert len(action) == 2
                     infoset.append(
-                        str(predict_cluster_fast(hand + community_cards, total_clusters=5))
+                        str(predict_cluster_fast(hand + community_cards, total_clusters=NUM_RIVER_CLUSTERS))
                     )
             else:
                 infoset.append(action)
@@ -408,6 +408,11 @@ def generate_dataset(num_samples=50000, save=True):
     """
     To make things faster, we pre-generate the boards and hands. We also pre-cluster the hands
     """
+    global boards, player_hands, opponent_hands
+    global player_flop_clusters, player_turn_clusters, player_river_clusters
+    global opp_flop_clusters, opp_turn_clusters, opp_river_clusters
+    global winners
+
     boards, player_hands, opponent_hands = phEvaluatorSetup(num_samples)
 
     np_boards = np.array(boards)
@@ -425,24 +430,24 @@ def generate_dataset(num_samples=50000, save=True):
     print("generating clusters")
 
     player_flop_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(player_flop_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=NUM_FLOP_CLUSTERS) for cards in tqdm(player_flop_cards)
     )
     player_turn_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(player_turn_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=NUM_TURN_CLUSTERS) for cards in tqdm(player_turn_cards)
     )
     player_river_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=10)
+        delayed(predict_cluster_fast)(cards, total_clusters=NUM_RIVER_CLUSTERS)
         for cards in tqdm(player_river_cards)
     )
 
     opp_flop_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(opp_flop_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=NUM_FLOP_CLUSTERS) for cards in tqdm(opp_flop_cards)
     )
     opp_turn_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(opp_turn_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=NUM_TURN_CLUSTERS) for cards in tqdm(opp_turn_cards)
     )
     opp_river_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(opp_river_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=NUM_RIVER_CLUSTERS) for cards in tqdm(opp_river_cards)
     )
 
     winners = Parallel(n_jobs=-1)(
@@ -476,8 +481,9 @@ if __name__ == "__main__":
     cfr = PostflopHoldemCFR(create_infoSet, create_history, iterations=ITERATIONS)
     for i in range(20):
         generate_dataset(save=False, num_samples=ITERATIONS)
-        cfr.solve(debug=False, method="vanilla_speedup")
-        cfr.export_infoSets(f"new_vanilla_speedup_infoSets_batch_{i}.joblib")
+        print(boards[0])
+        cfr.solve(debug=False, method="vanilla")
+        cfr.export_infoSets(f"postflop_infoSets_batch_{i}.joblib")
 
     # load_dataset()
     # cfr.infoSets = joblib.load("infoSets_2500.joblib")
