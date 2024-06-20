@@ -26,7 +26,7 @@ Strategy is stored at the infoset level.
 # TODO: use NumPy lookup instead of dictionary lookup for drastic speed improvement https://stackoverflow.com/questions/36652533/looking-up-large-sets-of-keys-dictionary-vs-numpy-array
 
 
-from typing import NewType, Dict, List, Callable, cast
+from typing import NewType, Dict, List
 from tqdm import tqdm
 import time
 import joblib
@@ -239,10 +239,13 @@ class CFR:
         """
         We double the speed by updating both player values simultaneously, since this is a zero-sum game.
 
-        NOTE: Doesn't work super well, I don't understand why. The trick here to speedup is by assuming by whatever the opponent gains is
+        The trick here to speedup is by assuming by whatever the opponent gains is
         the opposite of what we gain. Zero-sum game. However, need to make sure we always return the correct utility.
 
+        NOTE: For some reason, doesn't work super well, the strategies are not converging as well as they should.
+
         """
+        raise NotImplementedError()  # bad implementation, does not provide Nash equilibrium solution
         # Return payoff for terminal states
         # ['3d7c', '4cQd', '/', '7sKd9c', 'bMIN', 'f']
         if history.is_terminal():
@@ -352,14 +355,27 @@ class CFR:
     ):  # Works for two players
         raise NotImplementedError()
 
-    def solve(self, method="vanilla_speedup", debug=False):
+    def solve(self, method="vanilla", debug=False):
         util_0 = 0
         util_1 = 0
         if method == "manim":
             histories = []
 
         for t in tqdm(range(self.iterations), desc="CFR Training Loop"):
-            if method == "vanilla_speedup":
+            if method == "vanilla":  # vanilla
+                for player in range(
+                    self.n_players
+                ):  # This is the slower way, we can speed by updating both players
+                    if player == 0:
+                        util_0 += self.vanilla_cfr(
+                            self.create_history(t), player, t, 1, 1, debug=debug
+                        )
+                    else:
+                        util_1 += self.vanilla_cfr(
+                            self.create_history(t), player, t, 1, 1, debug=debug
+                        )
+
+            elif method == "vanilla_speedup":
                 util_0 += self.vanilla_cfr_speedup(self.create_history(t), t, 1, 1, debug=debug)
 
             elif method == "manim" and t < 10:
@@ -374,19 +390,6 @@ class CFR:
                         )
 
                 print(histories)
-
-            else:  # vanilla
-                for player in range(
-                    self.n_players
-                ):  # This is the slower way, we can speed by updating both players
-                    if player == 0:
-                        util_0 += self.vanilla_cfr(
-                            self.create_history(t), player, t, 1, 1, debug=debug
-                        )
-                    else:
-                        util_1 += self.vanilla_cfr(
-                            self.create_history(t), player, t, 1, 1, debug=debug
-                        )
 
             if (t + 1) % self.tracker_interval == 0:
                 print("Average game value player 0: ", util_0 / t)
@@ -536,4 +539,10 @@ class InfoSetTracker:
     def pprint(self):
         infoSets = self.tracker_hist[-1]
         for infoSet in infoSets.values():
-            print(infoSet.infoSet, "Regret: ", infoSet.regret, "Average Strategy: ", infoSet.get_average_strategy())
+            print(
+                infoSet.infoSet,
+                "Regret: ",
+                infoSet.regret,
+                "Average Strategy: ",
+                infoSet.get_average_strategy(),
+            )
