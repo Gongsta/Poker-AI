@@ -2,7 +2,8 @@
 from evaluator import *
 from typing import List
 from player import Player
-from aiplayer import AIPlayer
+from postflop_holdem import PostflopHoldemHistory, PostflopHoldemInfoSet
+from aiplayer import CFRAIPlayer
 
 
 class PokerEnvironment:
@@ -42,7 +43,7 @@ class PokerEnvironment:
         self.SMALL_BLIND = 1
         self.BIG_BLIND = 2
 
-        self.INPUT_CARDS = True
+        self.INPUT_CARDS = False
 
         self.history = []
         self.players_balance_history = []  # List of "n" list for "n" players
@@ -54,7 +55,7 @@ class PokerEnvironment:
         return self.players[idx]
 
     def add_AI_player(self):  # Add a dumb AI
-        self.players.append(AIPlayer(self.new_player_balance))
+        self.players.append(CFRAIPlayer(self.new_player_balance))
         self.AI_player_idx = len(self.players) - 1
 
     def get_winning_players(self) -> List:
@@ -358,14 +359,13 @@ class PokerEnvironment:
                     if player.playing_current_round:
                         player.trash_talk_win()
                     else:
-                        player.get_trash_lose()
+                        player.trash_talk_lose()
 
         else:
             for player in self.players:
                 if player.is_AI:
                     if player.playing_current_round:
                         player.trash_talk_fold()
-
 
         self.game_stage = 6  # mark end of round
         self.distribute_pot_to_winning_players()

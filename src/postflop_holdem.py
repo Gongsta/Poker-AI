@@ -5,10 +5,10 @@ To make this computationally feasible to solve on my macbook, I start solving at
 
 Card Abstraction
 - 10 clusters for flop
-- 5 clusters for turn
-- 5 clusters for river
+- 10 clusters for turn
+- 10 clusters for river
 
-10 * 5 * 5 = 250 clusters
+10^3 = 1000 clusters
 
 Bet abstraction (ONLY allow these 11 sequences)
 - k ("check")
@@ -31,7 +31,8 @@ bPOTc
 
 11^3 = 1331 possible sequences (3 stages: flop, turn, river)
 
-In total, we have 250 * 1331 = 332750 information sets.
+In total, we have 1000 * 1331 = 1 331 000 information sets.
+However, i noticed that only ~10% of the information sets are actually visited, since huge transitions are not possible.
 
 This keeps it manageable. Anything more is in orders of millions...
 """
@@ -42,7 +43,7 @@ from base import Player, Action
 from tqdm import tqdm
 from typing import List
 from abstraction import (
-    predict_cluster_pre,
+    predict_cluster_fast,
 )
 from fast_evaluator import phEvaluatorSetup, evaluate_cards
 import time
@@ -75,7 +76,7 @@ def load_dataset():
     winners = np.load("dataset/winners.npy")
 
 
-class HoldEmHistory(base.History):
+class PostflopHoldemHistory(base.History):
     """
     Example of history:
     First two actions are the cards dealt to the players. The rest of the actions are the actions taken by the players.
@@ -110,7 +111,7 @@ class HoldEmHistory(base.History):
 
     def __init__(self, history: List[Action] = [], sample_id=0):
         super().__init__(history)
-        self.sample_id = sample_id % len(player_hands)
+        self.sample_id = sample_id
         self.stage_i = history.count("/")
 
     def is_terminal(self):
@@ -159,8 +160,10 @@ class HoldEmHistory(base.History):
 
             if self.history[-1] == "k":
                 return ["k", "bMIN", "bMAX"]
-            elif self.history[-1] == "bMIN":
+            elif self.history[-2:] == ["k", "bMIN"]:
                 return ["f", "c"]
+            elif self.history[-1] == ["bMIN"]:
+                return ["bMAX", "f", "c"]
             elif self.history[-1] == "bMAX":
                 return ["f", "c"]
             else:
@@ -237,8 +240,6 @@ class HoldEmHistory(base.History):
         else:
             return -pot_size / 2
 
-
-
     def _get_total_pot_size(self, history):
         total = 0
         stage_total = 4  # assume preflop is a check + call, so 4 in pot (1 BB = 2 chips)
@@ -262,8 +263,49 @@ class HoldEmHistory(base.History):
         return total
 
     def __add__(self, action: Action):
-        new_history = HoldEmHistory(self.history + [action], self.sample_id)
+        new_history = PostflopHoldemHistory(self.history + [action], self.sample_id)
         return new_history
+
+    def get_infoSet_key_online(self) -> List[Action]:
+        history = self.history
+        player = self.player()
+        infoset = []
+        # ------- CARD ABSTRACTION -------
+        # Assign cluster ID for FLOP/TURN/RIVER
+        stage_i = 0
+        hand = []
+        if player == 0:
+            hand = [history[0][:2], history[0][2:4]]
+        else:
+            hand = [history[1][:2], history[1][2:4]]
+        community_cards = []
+        for i, action in enumerate(history):
+            if action not in DISCRETE_ACTIONS:
+                if action == "/":
+                    stage_i += 1
+                    continue
+                if stage_i != 0:
+                    community_cards += [history[i][j : j + 2] for j in range(0, len(action), 2)]
+                    print(hand + community_cards)
+                if stage_i == 1:
+                    assert len(action) == 6
+                    infoset.append(
+                        str(predict_cluster_fast(hand + community_cards, total_clusters=10))
+                    )
+                elif stage_i == 2:
+                    assert len(action) == 2
+                    infoset.append(
+                        str(predict_cluster_fast(hand + community_cards, total_clusters=5))
+                    )
+                elif stage_i == 3:
+                    assert len(action) == 2
+                    infoset.append(
+                        str(predict_cluster_fast(hand + community_cards, total_clusters=5))
+                    )
+            else:
+                infoset.append(action)
+
+        return "".join(infoset)
 
     def get_infoSet_key(self) -> List[Action]:
         """
@@ -305,7 +347,7 @@ class HoldEmHistory(base.History):
         return infoset
 
 
-class HoldemInfoSet(base.InfoSet):
+class PostflopHoldemInfoSet(base.InfoSet):
     """
     Information Sets (InfoSets) cannot be chance histories, nor terminal histories.
     This condition is checked when infosets are created.
@@ -330,14 +372,14 @@ def create_infoSet(infoSet_key: List[Action], actions: List[Action], player: Pla
     """
     We create an information set from a history.
     """
-    return HoldemInfoSet(infoSet_key, actions, player)
+    return PostflopHoldemInfoSet(infoSet_key, actions, player)
 
 
 def create_history(sample_id):
-    return HoldEmHistory(sample_id=sample_id)
+    return PostflopHoldemHistory(sample_id=sample_id)
 
 
-class PostFlopHoldemCFR(base.CFR):
+class PostflopHoldemCFR(base.CFR):
     def __init__(
         self,
         create_infoSet,
@@ -383,29 +425,24 @@ def generate_dataset(num_samples=50000, save=True):
     print("generating clusters")
 
     player_flop_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, n=1000, total_clusters=10)
-        for cards in tqdm(player_flop_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(player_flop_cards)
     )
     player_turn_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, n=1000, total_clusters=5)
-        for cards in tqdm(player_turn_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(player_turn_cards)
     )
     player_river_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, n=1000, total_clusters=5)
+        delayed(predict_cluster_fast)(cards, total_clusters=10)
         for cards in tqdm(player_river_cards)
     )
 
     opp_flop_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, n=1000, total_clusters=10)
-        for cards in tqdm(opp_flop_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(opp_flop_cards)
     )
     opp_turn_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, n=500, total_clusters=5)
-        for cards in tqdm(opp_turn_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(opp_turn_cards)
     )
     opp_river_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, n=200, total_clusters=5)
-        for cards in tqdm(opp_river_cards)
+        delayed(predict_cluster_fast)(cards, total_clusters=10) for cards in tqdm(opp_river_cards)
     )
 
     winners = Parallel(n_jobs=-1)(
@@ -436,14 +473,11 @@ def generate_dataset(num_samples=50000, save=True):
 if __name__ == "__main__":
     # Train in batches of 50,000 hands
     ITERATIONS = 50000
-    cfr = PostFlopHoldemCFR(create_infoSet, create_history, iterations=ITERATIONS)
+    cfr = PostflopHoldemCFR(create_infoSet, create_history, iterations=ITERATIONS)
     for i in range(20):
-        if i == 0:
-            load_dataset()
-        else:
-            generate_dataset(save=False, num_samples=ITERATIONS)
-        cfr.solve(debug=False, method="vanilla")
-        cfr.export_infoSets(f"infoSets_batch_{i}.joblib")
+        generate_dataset(save=False, num_samples=ITERATIONS)
+        cfr.solve(debug=False, method="vanilla_speedup")
+        cfr.export_infoSets(f"new_vanilla_speedup_infoSets_batch_{i}.joblib")
 
     # load_dataset()
     # cfr.infoSets = joblib.load("infoSets_2500.joblib")
@@ -462,7 +496,7 @@ if __name__ == "__main__":
 
 # 	"""
 
-#     hist: HoldEmHistory = create_history()
+#     hist: PostflopHoldemHistory = create_history()
 #     assert hist.player() == -1
 #     hist1 = hist + "AkTh"
 #     assert hist1.player() == -1
@@ -479,7 +513,7 @@ if __name__ == "__main__":
 #     hist6 = hist5 + "QhKsKh"
 #     assert hist6.player() == 1
 #     hist7 = hist6 + "b1"
-#     hist8: HoldEmHistory = hist7 + "b3"
+#     hist8: PostflopHoldemHistory = hist7 + "b3"
 #     curr = time.time()
 #     print(hist8.get_infoSet_key(kmeans_flop, kmeans_turn, kmeans_river), time.time() - curr)
 

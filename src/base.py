@@ -161,11 +161,10 @@ class CFR:
         create_history,
         n_players: int = 2,
         iterations: int = 1000000,
-        tracker_interval=1000,
     ):
         self.n_players = n_players
         self.iterations = iterations
-        self.tracker_interval = tracker_interval
+        self.tracker_interval = int(iterations / 10)
         self.infoSets: Dict[str, InfoSet] = {}
         self.create_infoSet = create_infoSet
         self.create_history = create_history
@@ -193,7 +192,7 @@ class CFR:
         if history.is_terminal():
             if debug:
                 print(f"history: {history.history} utility: {history.terminal_utility(i)}")
-                time.sleep(1)
+                time.sleep(0.1)
             return history.terminal_utility(i)
         elif history.is_chance():
             a = (
@@ -205,9 +204,6 @@ class CFR:
 
         infoSet = self.get_infoSet(history)
         assert infoSet.player() == history.player()
-
-        if debug:
-            print("infoset", infoSet.to_dict())
 
         v = 0
         va = {}
@@ -233,19 +229,30 @@ class CFR:
             # Update regret matching values
             infoSet.get_strategy()
 
+        if debug:
+            print("infoset", infoSet.to_dict())
+            print("strategy", infoSet.strategy)
+
         return v
 
     def vanilla_cfr_speedup(self, history: History, t: int, pi_0: float, pi_1: float, debug=False):
         """
         We double the speed by updating both player values simultaneously, since this is a zero-sum game.
 
+        NOTE: Doesn't work super well, I don't understand why. The trick here to speedup is by assuming by whatever the opponent gains is
+        the opposite of what we gain. Zero-sum game. However, need to make sure we always return the correct utility.
+
         """
         # Return payoff for terminal states
+        # ['3d7c', '4cQd', '/', '7sKd9c', 'bMIN', 'f']
         if history.is_terminal():
             if debug:
-                print(history.history, history.terminal_utility(0))
-                time.sleep(1)
-            return history.terminal_utility(0)
+                print(
+                    f"utility returned: {history.terminal_utility((len(history.get_last_game_stage())) % 2)}, history: {history.history}"
+                )
+            return history.terminal_utility(
+                (len(history.get_last_game_stage()) + 1) % 2
+            )  # overfit solution for holdem
         elif history.is_chance():
             a = (
                 history.sample_chance_outcome()
@@ -256,9 +263,6 @@ class CFR:
 
         infoSet = self.get_infoSet(history)
         assert infoSet.player() == history.player()
-
-        if debug:
-            print("infoset", infoSet.to_dict())
 
         v = 0
         va = {}
@@ -284,6 +288,12 @@ class CFR:
 
         # Update regret matching values
         infoSet.get_strategy()
+
+        if debug:
+            print("infoset", infoSet.to_dict())
+            print("va", va)
+            print("strategy", infoSet.strategy)
+            time.sleep(0.1)
 
         return v
 
@@ -356,11 +366,11 @@ class CFR:
                 for player in range(self.n_players):
                     if player == 0:
                         util_0 += self.vanilla_cfr_manim(
-                            self.create_history(), player, t, 1, 1, histories
+                            self.create_history(t), player, t, 1, 1, histories
                         )
                     else:
                         util_1 += self.vanilla_cfr_manim(
-                            self.create_history(), player, t, 1, 1, histories
+                            self.create_history(t), player, t, 1, 1, histories
                         )
 
                 print(histories)
@@ -371,11 +381,11 @@ class CFR:
                 ):  # This is the slower way, we can speed by updating both players
                     if player == 0:
                         util_0 += self.vanilla_cfr(
-                            self.create_history(), player, t, 1, 1, debug=debug
+                            self.create_history(t), player, t, 1, 1, debug=debug
                         )
                     else:
                         util_1 += self.vanilla_cfr(
-                            self.create_history(), player, t, 1, 1, debug=debug
+                            self.create_history(t), player, t, 1, 1, debug=debug
                         )
 
             if (t + 1) % self.tracker_interval == 0:
@@ -384,13 +394,14 @@ class CFR:
                 self.tracker(self.infoSets)
                 self.tracker.pprint()
 
-            if t % 2500 == 0:
+            if t % 500000 == 0:
                 self.export_infoSets(f"infoSets_{t}.joblib")
 
+        self.export_infoSets("infoSets_solved.joblib")
         if method == "manim":
             return histories
 
-    def export_infoSets(self, filename = "infoSets.joblib"):
+    def export_infoSets(self, filename="infoSets.joblib"):
         joblib.dump(self.infoSets, filename)
 
     def get_expected_value(
@@ -525,4 +536,4 @@ class InfoSetTracker:
     def pprint(self):
         infoSets = self.tracker_hist[-1]
         for infoSet in infoSets.values():
-            print(infoSet.infoSet, infoSet.get_average_strategy())
+            print(infoSet.infoSet, "Regret: ", infoSet.regret, "Average Strategy: ", infoSet.get_average_strategy())

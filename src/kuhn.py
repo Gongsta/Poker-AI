@@ -117,7 +117,7 @@ class KuhnInfoSet(base.InfoSet):
     """
 
     def __init__(self, infoSet_key: List[Action], actions: List[Action], player: Player):
-        assert len(infoSet) >= 2
+        assert len(infoSet_key) >= 2
         super().__init__(infoSet_key, actions, player)
 
 
@@ -128,12 +128,12 @@ def create_infoSet(infoSet_key: List[Action], actions: List[Action], player: Pla
     return KuhnInfoSet(infoSet_key, actions, player)
 
 
-def create_history():
+def create_history(t):
     return KuhnHistory()
 
 
 if __name__ == "__main__":
-    cfr = base.CFR(create_infoSet, create_history)
-    cfr.solve()
+    cfr = base.CFR(create_infoSet, create_history, iterations=5000)
+    cfr.solve(debug=False, method="vanilla")
     # TODO: Add playing option, right now there is old code in research/kuhn,
     # which is not oop
