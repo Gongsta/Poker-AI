@@ -287,7 +287,7 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 
     # Pressable Buttons for Check / Fold / Raise. Only display buttons if it is your turn
     warning_text_rendered = BET_FONT.render(warning_text, 1, RED)
-    WIN.blit(warning_text_rendered, (WIDTH - 250, HEIGHT - 120))
+    WIN.blit(warning_text_rendered, scale_tuple((WIDTH - 250, HEIGHT - 120), scale_factor))
 
     if user_input:
         # AAfilledRoundedRect(WIN, RED, pygame.Rect(392,400, 120,50), radius=0.4)
@@ -327,7 +327,12 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
 
             if cursor_counter < 15 and active:
                 pygame.draw.rect(
-                    WIN, (0, 0, 0), (WIDTH - 210 + 13 * len(input_bet_text), HEIGHT - 70, 1, 20), 1
+                    WIN,
+                    (0, 0, 0),
+                    scale_tuple(
+                        (WIDTH - 210 + 13 * len(input_bet_text), HEIGHT - 70, 1, 20), scale_factor
+                    ),
+                    1,
                 )
 
     pygame.display.update()
@@ -383,9 +388,10 @@ def main():
     # else:
     #     env.add_AI_player()  # Opponent
     # play as the AI
-    env.add_AI_player()
-    env.add_AI_player()
+    # env.add_AI_player()
     # env.add_player()
+    env.add_AI_player()
+    env.add_player()
     # env.add_player()  # play as the opponent too
     env.start_new_round()
 

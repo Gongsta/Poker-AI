@@ -51,6 +51,7 @@ import sys
 import argparse
 import os
 import joblib
+from tqdm import tqdm
 
 sys.path.append("../src")
 
@@ -68,19 +69,22 @@ Here are the strategies that we want to test out. Since Poker is high variance, 
 - (Strategy 1) Only play the hands where you have over 50% chance of winning using my `calculate_equity` function
 - (Strategy 2) Use the CFR algorithm
 """
-STRATEGY = 1  # SET THE STRATEGY HERE
+STRATEGY = 0  # SET THE STRATEGY HERE
 
-history = []
 if STRATEGY == 0:
-    USERNAME = "steveng_call"
-    PASSWORD = "callingstation"
+    USERNAME = "calling_station"
+    PASSWORD = "calling_station"
 elif STRATEGY == 1:
-    # USERNAME = "steveng_equity"
-    USERNAME = "pokerv1"
-    PASSWORD = "equitybet"
+    USERNAME = "dumb_equity"
+    PASSWORD = "dumb_equity"
 elif STRATEGY == 2:
-    USERNAME = "steveng_cfr"
-    PASSWORD = "cfrpleasework"
+    USERNAME = "smart_equity"
+    PASSWORD = "smart_equity"
+elif STRATEGY == 3:
+    USERNAME = "cfr_abstraction"
+    PASSWORD = "cfr_abstraction"
+elif STRATEGY == 4:
+    USERNAME = "preflop"
 
 # if os.path.exists(f"../data/slumbot/{USERNAME}.joblib"):  # Load previous history if it exists
 #     history = joblib.load(f"../data/slumbot/{USERNAME}.joblib")
@@ -316,6 +320,7 @@ def Act(token, action):
 from aiplayer import getAction
 import numpy as np
 
+
 def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
     a = ParseAction(action)
 
@@ -325,19 +330,19 @@ def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
         else:  # opponent has bet, so simply call
             incr = "c"
     elif strategy == 1:
-    #     equity = calculate_equity(hole_cards, board, n=5000)
-    #     print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
-    #     if a["last_bettor"] == -1:
-    #         if equity >= 0.5:
-    #             incr = "b1000"
-    #         else:
-    #             incr = "k"
-    #     else:
-    #         if equity >= 0.5:
-    #             incr = "c"
-    #         else:
-    #             incr = "f"
-    # elif strategy == 3:
+            equity = calculate_equity(hole_cards, board, n=5000)
+            print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
+            if a["last_bettor"] == -1:
+                if equity >= 0.5:
+                    incr = "b1000"
+                else:
+                    incr = "k"
+            else:
+                if equity >= 0.5:
+                    incr = "c"
+                else:
+                    incr = "f"
+    elif strategy == 2:
         card_str = hole_cards
         community_cards = board
         # if observed_env.game_stage == 2:
@@ -346,14 +351,14 @@ def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
         # fold, check / call, raise
         np_strategy = np.abs(np.array([1.0 - (equity + equity / 2.0), equity, equity / 2.0]))
         np_strategy = np_strategy / np.sum(np_strategy)  # normalize
-        remaining = 20000 -  (a["total_last_bet_to"] - a["street_last_bet_to"])
+        remaining = 20000 - (a["total_last_bet_to"] - a["street_last_bet_to"])
 
         if a["street_last_bet_to"] == 0:  # no bet placed
             if a["pos"] == 1:  # If you are the dealer, raise more of the time
                 strategy = {
                     "k": np_strategy[0],
                     f"b{min(100, remaining)}": np_strategy[2],
-                    f"b{min(2 * a['total_last_bet_to'], remaining)}": np_strategy[1], # pot-size
+                    f"b{min(2 * a['total_last_bet_to'], remaining)}": np_strategy[1],  # pot-size
                 }
             else:
                 strategy = {
@@ -368,12 +373,10 @@ def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
                 strategy = {
                     "k": np_strategy[0],
                     f"b{min(int(1.5 * a['street_last_bet_to']), remaining)}": np_strategy[1],
-                    f"b{min(2 *a['street_last_bet_to'], remaining)}": np_strategy[
-                        2
-                    ],
+                    f"b{min(2 *a['street_last_bet_to'], remaining)}": np_strategy[2],
                 }
             else:
-                if remaining ==  a["street_last_bet_to"]:
+                if remaining == a["street_last_bet_to"]:
                     strategy = {
                         "f": np_strategy[0],
                         "c": np_strategy[1] + np_strategy[2],
@@ -382,9 +385,7 @@ def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
                     strategy = {
                         "f": np_strategy[0],
                         "c": np_strategy[1],
-                        f"b{min(2 * a['street_last_bet_to'], remaining)}": np_strategy[
-                            2
-                        ],
+                        f"b{min(2 * a['street_last_bet_to'], remaining)}": np_strategy[2],
                     }
 
         print(action, a)
@@ -407,7 +408,6 @@ def PlayHand(token, debug=False):
 
     while True:
         if r.get("session_num_hands"):
-            history.append(r)
             print(
                 f"Total hands played:{r.get('session_num_hands')} Total Profit: {r.get('session_total')} Total Relative Profit: {r.get('session_baseline_total')}"
             )
@@ -491,14 +491,25 @@ def main():
     # To avoid SSLError:
     #   import urllib3
     #   urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    num_hands = 100000
+    num_hands = 10000
     winnings = 0
-    for h in range(num_hands):
-        (token, hand_winnings) = PlayHand(token)
-        winnings += hand_winnings
-        # if h % 100 == 0:
-        #     print(history)
-        #     joblib.dump(history, f"../data/slumbot/{USERNAME}.joblib")
+    winnings_history = []
+
+    for h in tqdm(range(num_hands)):
+        try:
+            (token, hand_winnings) = PlayHand(token)
+            winnings += hand_winnings
+            winnings_history.append(winnings)
+            if h % 1000 == 0:
+                joblib.dump(
+                    winnings_history, f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}.joblib"
+                )
+                #     print(history)
+        except Exception as e:
+            print(e)
+            num_hands += 1
+
+    joblib.dump(winnings_history, f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}.joblib")
     print("Total winnings: %i" % winnings)
 
 
