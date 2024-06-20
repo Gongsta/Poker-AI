@@ -3,12 +3,21 @@ Abstracted version of No Limit Texas Hold'Em Poker for post-flop onwards. Also s
 
 I do this to make it computationally feasible to solve on my macbook.
 
-Card Abstraction
+
+Card Abstraction (equity only)
 - 10 clusters for flop
 - 10 clusters for turn
 - 10 clusters for river
 
 Total = 10^3 = 1000 clusters
+
+TODO: More refined card abstraction using equity distribution
+Card Abstraction (equity distribution, to compute potential of hand)
+- 50 clusters for flop
+- 50 clusters for turn
+- 10 clusters for river (this only needs equity)
+
+Total = 10 * 50^2 = 25000 clusters
 
 Bet abstraction (ONLY allow these 11 sequences), more on these below
 - kk
@@ -35,43 +44,11 @@ This keeps it manageable for training.
 import base
 import numpy as np
 from base import Player, Action
-from tqdm import tqdm
 from typing import List
-from abstraction import (
-    predict_cluster_fast,
-)
-from fast_evaluator import phEvaluatorSetup, evaluate_cards
-import time
+from abstraction import predict_cluster
+import abstraction
 
 DISCRETE_ACTIONS = ["k", "bMIN", "bMAX", "c", "f"]
-NUM_FLOP_CLUSTERS = 10
-NUM_TURN_CLUSTERS = 10
-NUM_RIVER_CLUSTERS = 10
-
-
-# ----- GLOBAL VARIABLES Load the pre-generated dataset -----
-def load_dataset():
-    global boards, player_hands, opponent_hands
-    global player_flop_clusters, player_turn_clusters, player_river_clusters
-    global opp_flop_clusters, opp_turn_clusters, opp_river_clusters
-    global winners
-
-    # Load the pre-generated dataset
-    boards = np.load("dataset/boards.npy").tolist()
-    player_hands = np.load("dataset/player_hands.npy").tolist()
-    opponent_hands = np.load("dataset/opponent_hands.npy").tolist()
-
-    # Load player clusters
-    player_flop_clusters = np.load("dataset/player_flop_clusters.npy").tolist()
-    player_turn_clusters = np.load("dataset/player_turn_clusters.npy").tolist()
-    player_river_clusters = np.load("dataset/player_river_clusters.npy").tolist()
-
-    # Load opponent clusters
-    opp_flop_clusters = np.load("dataset/opp_flop_clusters.npy").tolist()
-    opp_turn_clusters = np.load("dataset/opp_turn_clusters.npy").tolist()
-    opp_river_clusters = np.load("dataset/opp_river_clusters.npy").tolist()
-
-    winners = np.load("dataset/winners.npy")
 
 
 class PostflopHoldemHistory(base.History):
@@ -289,19 +266,13 @@ class PostflopHoldemHistory(base.History):
                     print(hand + community_cards)
                 if stage_i == 1:
                     assert len(action) == 6
-                    infoset.append(
-                        str(predict_cluster_fast(hand + community_cards, total_clusters=NUM_FLOP_CLUSTERS))
-                    )
+                    infoset.append(str(predict_cluster(hand + community_cards)))
                 elif stage_i == 2:
                     assert len(action) == 2
-                    infoset.append(
-                        str(predict_cluster_fast(hand + community_cards, total_clusters=NUM_TURN_CLUSTERS))
-                    )
+                    infoset.append(str(predict_cluster(hand + community_cards)))
                 elif stage_i == 3:
                     assert len(action) == 2
-                    infoset.append(
-                        str(predict_cluster_fast(hand + community_cards, total_clusters=NUM_RIVER_CLUSTERS))
-                    )
+                    infoset.append(str(predict_cluster(hand + community_cards)))
             else:
                 infoset.append(action)
 
@@ -390,138 +361,30 @@ class PostflopHoldemCFR(base.CFR):
         super().__init__(create_infoSet, create_history, n_players, iterations)
 
 
-from joblib import Parallel, delayed
-
-
-def evaluate_winner(board, player_hand, opponent_hand):
-    p1_score = evaluate_cards(*(board + player_hand))
-    p2_score = evaluate_cards(*(board + opponent_hand))
-    if p1_score < p2_score:
-        return 1
-    elif p1_score > p2_score:
-        return -1
-    else:
-        return 0
-
-
-def generate_dataset(num_samples=50000, save=True):
-    """
-    To make things faster, we pre-generate the boards and hands. We also pre-cluster the hands
-    """
-    global boards, player_hands, opponent_hands
-    global player_flop_clusters, player_turn_clusters, player_river_clusters
-    global opp_flop_clusters, opp_turn_clusters, opp_river_clusters
-    global winners
-
-    boards, player_hands, opponent_hands = phEvaluatorSetup(num_samples)
-
-    np_boards = np.array(boards)
-    np_player_hands = np.array(player_hands)
-    np_opponent_hands = np.array(opponent_hands)
-
-    player_flop_cards = np.concatenate((np_player_hands, np_boards[:, :3]), axis=1).tolist()
-    player_turn_cards = np.concatenate((np_player_hands, np_boards[:, :4]), axis=1).tolist()
-    player_river_cards = np.concatenate((np_player_hands, np_boards), axis=1).tolist()
-    opp_flop_cards = np.concatenate((np_opponent_hands, np_boards[:, :3]), axis=1).tolist()
-    opp_turn_cards = np.concatenate((np_opponent_hands, np_boards[:, :4]), axis=1).tolist()
-    opp_river_cards = np.concatenate((np_opponent_hands, np_boards), axis=1).tolist()
-
-    curr = time.time()
-    print("generating clusters")
-
-    player_flop_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=NUM_FLOP_CLUSTERS) for cards in tqdm(player_flop_cards)
-    )
-    player_turn_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=NUM_TURN_CLUSTERS) for cards in tqdm(player_turn_cards)
-    )
-    player_river_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=NUM_RIVER_CLUSTERS)
-        for cards in tqdm(player_river_cards)
-    )
-
-    opp_flop_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=NUM_FLOP_CLUSTERS) for cards in tqdm(opp_flop_cards)
-    )
-    opp_turn_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=NUM_TURN_CLUSTERS) for cards in tqdm(opp_turn_cards)
-    )
-    opp_river_clusters = Parallel(n_jobs=-1)(
-        delayed(predict_cluster_fast)(cards, total_clusters=NUM_RIVER_CLUSTERS) for cards in tqdm(opp_river_cards)
-    )
-
-    winners = Parallel(n_jobs=-1)(
-        delayed(evaluate_winner)(board, player_hand, opponent_hand)
-        for board, player_hand, opponent_hand in tqdm(zip(boards, player_hands, opponent_hands))
-    )
-
-    if save:
-        print("saving datasets")
-
-        np.save("dataset/boards.npy", boards)
-        np.save("dataset/player_hands.npy", player_hands)
-        np.save("dataset/opponent_hands.npy", opponent_hands)
-        np.save("dataset/winners.npy", winners)
-        print("continuing to save datasets")
-
-        np.save("dataset/player_flop_clusters.npy", player_flop_clusters)
-        np.save("dataset/player_turn_clusters.npy", player_turn_clusters)
-        np.save("dataset/player_river_clusters.npy", player_river_clusters)
-
-        np.save("dataset/opp_flop_clusters.npy", opp_flop_clusters)
-        np.save("dataset/opp_turn_clusters.npy", opp_turn_clusters)
-        np.save("dataset/opp_river_clusters.npy", opp_river_clusters)
-
-    print(time.time() - curr)
-
-
 if __name__ == "__main__":
     # Train in batches of 50,000 hands
     ITERATIONS = 50000
     cfr = PostflopHoldemCFR(create_infoSet, create_history, iterations=ITERATIONS)
     for i in range(20):
-        generate_dataset(save=False, num_samples=ITERATIONS)
+        try:
+            abstraction.load_dataset(i)
+        except Exception as e:
+            print("Got error loading dataset: ", e)
+            print("Generating new dataset")
+            abstraction.generate_dataset(i)
+
+        # ----- Load the variables locally -----
+        boards = abstraction.boards
+        player_hands = abstraction.player_hands
+        opponent_hands = abstraction.opponent_hands
+        player_flop_clusters = abstraction.player_flop_clusters
+        player_turn_clusters = abstraction.player_turn_clusters
+        player_river_clusters = abstraction.player_river_clusters
+        opp_flop_clusters = abstraction.opp_flop_clusters
+        opp_turn_clusters = abstraction.opp_turn_clusters
+        opp_river_clusters = abstraction.opp_river_clusters
+        winners = abstraction.winners
+
         print(boards[0])
         cfr.solve(debug=False, method="vanilla")
         cfr.export_infoSets(f"postflop_infoSets_batch_{i}.joblib")
-
-    # load_dataset()
-    # cfr.infoSets = joblib.load("infoSets_2500.joblib")
-    # print("finished loading")
-    # cfr.solve(debug=True)
-    # cfr.solve_multiprocess(
-    #     initializer=load_dataset,
-    # )
-
-#     """
-# 	When we work with these abstractions, we have two types:
-# 	1. Action Abstraction
-# 	2. Card Abstraction
-
-# 	Both of these are implemented in a different way.
-
-# 	"""
-
-#     hist: PostflopHoldemHistory = create_history()
-#     assert hist.player() == -1
-#     hist1 = hist + "AkTh"
-#     assert hist1.player() == -1
-#     hist2 = hist1 + "QdKd"
-#     assert hist2.player() == 0
-#     print(hist2.get_infoSet_key(kmeans_flop, kmeans_turn, kmeans_river))
-#     hist3 = hist2 + "b2"
-#     assert hist3.player() == 1
-#     hist4 = hist3 + "c"
-#     assert hist4.player() == -1
-#     # Below are chance events, so it doesn't matter which player it is
-#     hist5 = hist4 + "/"
-#     assert hist5.player() == -1
-#     hist6 = hist5 + "QhKsKh"
-#     assert hist6.player() == 1
-#     hist7 = hist6 + "b1"
-#     hist8: PostflopHoldemHistory = hist7 + "b3"
-#     curr = time.time()
-#     print(hist8.get_infoSet_key(kmeans_flop, kmeans_turn, kmeans_river), time.time() - curr)
-
-#     # cfr = base.CFR(create_infoSet, create_history)
-#     # cfr.solve()

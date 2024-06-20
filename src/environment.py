@@ -99,9 +99,9 @@ class PokerEnvironment:
 
     def valid_actions(self):
         """
-        Make sure this logic is unified with holdem.py
+        Mostly just enables checking whether it is allowed to check, or call.
         """
-        valid_actions = ["b1", "b2", "f"]
+        valid_actions = ["f"]
         if self.players[0].current_bet == self.players[1].current_bet:
             valid_actions.append("k")
         else:

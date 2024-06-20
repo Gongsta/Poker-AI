@@ -3,6 +3,9 @@ import pyttsx3
 import numpy as np
 from player import Player
 from abstraction import calculate_equity
+from postflop_holdem import PostflopHoldemHistory, PostflopHoldemInfoSet
+import joblib
+import copy
 
 
 def getAction(strategy):
@@ -109,7 +112,7 @@ class EquityAIPlayer(AIPlayer):
 
     def place_bet(self, observed_env) -> int:  # AI will call every time
         """
-        A Strategy implemented with human heuristics
+        A Strategy implemented with human heuristics.
         """
         if "k" in observed_env.valid_actions():
             action = "k"
@@ -119,44 +122,65 @@ class EquityAIPlayer(AIPlayer):
         card_str = [str(card) for card in self.hand]
         community_cards = [str(card) for card in observed_env.community_cards]
 
-        equity = calculate_equity(card_str, community_cards)
+        isDealer = self == observed_env.get_player(observed_env.dealer_button_position)
+        checkAllowed = "k" in observed_env.valid_actions()
 
+        action = self.get_action(
+            card_str,
+            community_cards,
+            observed_env.total_pot_balance,
+            observed_env.get_highest_current_bet(),
+            observed_env.BIG_BLIND,
+            self.player_balance,
+            isDealer,
+            checkAllowed,
+        )
+
+        self.process_action(action, observed_env)  # use voice activation
+        return action
+
+    def get_action(
+        self,
+        card_str,
+        community_cards,
+        total_pot_balance,
+        highest_current_bet,
+        BIG_BLIND,
+        player_balance,
+        isDealer,
+        checkAllowed,
+    ):
+        equity = calculate_equity(card_str, community_cards)
         # fold, check / call, raise
         np_strategy = np.abs(np.array([1.0 - (equity + equity / 2.0), equity, equity / 2.0]))
         np_strategy = np_strategy / np.sum(np_strategy)  # normalize
 
-        if observed_env.stage_pot_balance == 0:  # no bet placed
-            if self == observed_env.get_player(
-                observed_env.dealer_button_position
-            ):  # If you are the dealer, raise more of the time
+        if highest_current_bet == 0:  # no bet placed
+            if isDealer:  # If you are the dealer, raise more of the time
                 strategy = {
                     "k": np_strategy[0],
-                    f"b{min(max(observed_env.BIG_BLIND, int(observed_env.total_pot_balance / 3)), self.player_balance)}": np_strategy[
+                    f"b{min(max(BIG_BLIND, int(total_pot_balance / 3)), self.player_balance)}": np_strategy[
                         2
                     ],
-                    f"b{min(observed_env.total_pot_balance, self.player_balance)}": np_strategy[1],
+                    f"b{min(total_pot_balance, self.player_balance)}": np_strategy[1],
                 }
             else:
                 strategy = {
                     "k": equity,
-                    f"b{min(observed_env.total_pot_balance, self.player_balance)}": 1 - equity,
+                    f"b{min(total_pot_balance, self.player_balance)}": 1 - equity,
                 }
 
         else:  # if there is a bet already
             # TODO: calculate proportional to bet size. i mean, it just does it according to bet size
             # normalize the strategy
-            if "k" in observed_env.valid_actions():
+            if checkAllowed:
                 strategy = {
                     "k": np_strategy[0],
-                    f"b{min(int(1.5 * observed_env.get_highest_current_bet()), self.player_balance)}": np_strategy[
-                        1
-                    ],
-                    f"b{min(2 * observed_env.get_highest_current_bet(), self.player_balance)}": np_strategy[
-                        2
-                    ],
+                    f"b{min(int(1.5 * highest_current_bet), player_balance)}": np_strategy[1],
+                    f"b{min(2 * highest_current_bet, player_balance)}": np_strategy[2],
                 }
             else:
-                if observed_env.get_highest_current_bet() == self.player_balance:
+                if highest_current_bet == player_balance:
                     strategy = {
                         "f": np_strategy[0],
                         "c": np_strategy[1] + np_strategy[2],
@@ -165,37 +189,27 @@ class EquityAIPlayer(AIPlayer):
                     strategy = {
                         "f": np_strategy[0],
                         "c": np_strategy[1],
-                        f"b{min(2 * observed_env.get_highest_current_bet(), self.player_balance)}": np_strategy[
-                            2
-                        ],
+                        f"b{min(2 * highest_current_bet, player_balance)}": np_strategy[2],
                     }
 
         print(card_str, community_cards)
-        print(observed_env.get_highest_current_bet())
+        print(highest_current_bet)
         print("equity", equity)
         print("AI strategy ", strategy)
         action = getAction(strategy)
-        self.process_action(action, observed_env)
         return action
-
-
-import joblib
-from abstraction import calculate_equity, predict_cluster_fast
-from postflop_holdem import HoldemInfoSet, HoldEmHistory
-
-import copy
 
 
 class CFRAIPlayer(AIPlayer):
     def __init__(self, balance) -> None:
         super().__init__(balance)
 
-        self.infosets = joblib.load("../src/infoSets_batch_7.joblib")
+        self.postflop_infosets = joblib.load("../src/postflop_infoSets_batch_0.joblib")
 
-    def perform_postflop_abstraction(self, observed_env):
-        history = copy.deepcopy(observed_env.history)
+    def perform_postflop_abstraction(self, history, BIG_BLIND=2):
+        history = copy.deepcopy(history)
 
-        pot_total = observed_env.BIG_BLIND * 2
+        pot_total = BIG_BLIND * 2
         # Compute preflop pot size
         flop_start = history.index("/")
         for i, action in enumerate(history[:flop_start]):
@@ -203,10 +217,8 @@ class CFRAIPlayer(AIPlayer):
                 bet_size = int(action[1:])
                 pot_total = 2 * bet_size
 
-        # Remove preflop actions
+        # ------- Remove preflop actions + bet abstraction -------
         abstracted_history = history[:2]
-
-        # Bet Abstraction (card abstraction is done later)
         stage_start = flop_start
         stage = self.get_stage(history[stage_start + 1 :])
         latest_bet = 0
@@ -266,27 +278,41 @@ class CFRAIPlayer(AIPlayer):
             return history
 
     def place_bet(self, observed_env):
-        if observed_env.game_stage == 2:  # preflop
-            if "k" in observed_env.valid_actions():
+        action = self.get_action()
+        self.process_action(action, observed_env)  # use voice activation
+        return action
+
+    def get_action(
+        self,
+        history,
+        card_str,
+        community_cards,
+        total_pot_balance,
+        player_balance,
+        BIG_BLIND,
+        isDealer,
+        checkAllowed,
+    ):
+        if len(community_cards) == 0:  # preflop
+            if checkAllowed:
                 action = "k"
             else:
                 action = "c"
         else:
-            abstracted_history = self.perform_postflop_abstraction(observed_env)
-            print("abstracted history", abstracted_history)
-            infoset_key = HoldEmHistory(abstracted_history).get_infoSet_key_online()
-            strategy = self.infosets[infoset_key].get_average_strategy()
+            print("history: ", history)
+            abstracted_history = self.perform_postflop_abstraction(history, BIG_BLIND=BIG_BLIND)
+            print("Abstracted history: ", abstracted_history)
+            infoset_key = PostflopHoldemHistory(abstracted_history).get_infoSet_key_online()
+            print("Infoset key: ", infoset_key)
+            strategy = self.postflop_infosets[infoset_key].get_average_strategy()
             print(infoset_key)
             print("AI strategy ", strategy)
             action = getAction(strategy)
             if action == "bMIN":
-                action = "b" + str(
-                    max(observed_env.BIG_BLIND, int(1 / 3 * observed_env.total_pot_balance))
-                )
+                action = "b" + str(max(BIG_BLIND, int(1 / 3 * total_pot_balance)))
             elif action == "bMAX":
-                action = "b" + str(min(observed_env.total_pot_balance, self.player_balance))
+                action = "b" + str(min(total_pot_balance, player_balance))
 
-            self.process_action(action, observed_env)
         return action
 
 

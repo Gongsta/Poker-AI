@@ -1,18 +1,26 @@
 """
-Python file that takes care of betting and card abstractions for Poker.
+Python file that takes care of betting and card abstractions for Poker, used for training.
 
-Inspired from Noam Brown's paper: https://arxiv.org/pdf/1805.08195.pdf
+For BET ABSTRACTION, the logic is directly encoded into the CFR training (see `postflop_holdem.py` for an example)
 
-"The blueprint abstraction treats every poker hand separately on the first betting round (where there are
-169 strategically distinct hands). On the remaining betting rounds, the hands are grouped into 30,000
-buckets. The hands in each bucket are treated identically and have a shared strategy, so
-they can be thought as sharing an abstract infoset".
+CARD ABSTRACTION
 
-*Note on Card Abstraction: While I wrote my own Card and Deck object implements, it is simply too slow. Rather, working with string representation is much faster and memory-efficient.
+Description:
+We the equity of a given hand / paired with a board, the EHS of a pair of cards.
+at different stages of the game, which is calculated assuming a random uniform draw of opponent hands and random uniform rollout of public cards.
 
+It uses a simple Monte-Carlo method, which samples lots of hands. Over lots of iterations, it will converge
+to the expected hand strength. To have a descriptive description of the potential of a hand, I use
+an equity distribution rather than a scalar value. This idea was taken from this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
+
+This kind of abstraction is used by all superhuman Poker AIs.
+
+We can cluster hands using K-Means to cluster hands of similar distance. The distance metric used is Earth Mover's
+Distance, which is taken from the Python Optiaml Transport Library.
+
+How do I find the optimal number of clusters?
 """
 
-from copy import deepcopy
 from typing import List
 import fast_evaluator
 from phevaluator import evaluate_cards
@@ -24,135 +32,150 @@ import os
 import glob
 import joblib
 from joblib import Parallel, delayed
-
-"""
-BET ABSTRACTION, hmm this logic directly encoded in `holdem.py`
-"""
-# For action abstraction, I have decided to simplify the actions to fold (f), check (k), call (c), small-bet (0.5x pot), medium-bet (1x pot), large-bet (2x pot), and all-in.
-
-# def bet_abstraction(bet_size):
-# 	"""Bet size is relative to pot.
-
-# 	"""
-# 	if bet_size == 0:
-# 		return 'c'
-# 	elif bet_size <= 0.5:
-# 		return 0.5
-# 	elif bet_size <= 1.0:
-# 		return 1.0
-# 	elif bet_size <= 2.0:
-# 		return 2.0
-# 	else:
-# 		return 'all-in'
-
-# def abstraction():
-# 			# TODO: Investigate the effect of action abstraction on exploitability.
-# 			"""
-
-# 			Daniel Negreanu: How Much Should You Raise? https://www.youtube.com/watch?v=WqRUyYQcc5U
-# 			Bet sizing: https://www.consciouspoker.com/blog/poker-bet-sizing-strategy/#:~:text=We%20recommend%20using%201.5x,t%20deduce%20your%20likely%20holdings.
-# 			Also see slumbot notes: https://nanopdf.com/queue/slumbot-nl-solving-large-games-with-counterfactual_pdf?queue_id=-1&x=1670505293&z=OTkuMjA5LjUyLjEzOA==
-
-# 			TODO: Check the case on preflop when the small blind simply calls, the BB should have the option to min-raise by amounts.
-
-
-# 			For initial bets, these are fractions of the total pot size (money at the center of the table):
-# 			for bets:
-# 				- b0.25 = bet 25% of the pot
-# 				- b0.5 = bet 50% of the pot
-# 				- b0.75 = bet 75% of the pot
-# 				- b1 = bet 100% of the pot
-# 				- b2 = ...
-# 				- b4 = ...
-# 				- b8 =
-# 				- all-in = all-in, opponent is forced to either call or fold
-
-# 			After a bet has happened, we can only raise by a certain amount.
-# 				- b0.5
-# 				- b1
-# 				- b2 = 2x pot size
-# 				- b4 = 4x pot size
-# 				- b8 = 8x pot size
-# 				- all-in = all-in, opponent is forced to either call or fold
-
-# 			2-bet is the last time we can raise again
-# 			- b1
-# 			- b2 = 2x pot size
-# 			- all-in
-
-# 			3-bet
-# 			- b1
-
-# 			4-bet
-# 			- all-in
-# 			"""
-
-# 			# Note: all-in case is just the maximum bet
-
-# 		actions = ['k', 'b0.25','b0.5', 'b0.75', 'b1', 'b2', 'b4', 'b8', 'all-in', 'c', 'f']
-
-# 		current_game_stage_history, stage = self.get_current_game_stage_history()
-
-# 		# Pre-flop
-# 		if stage == 'preflop':
-# 		# Small blind to act
-# 			if len(current_game_stage_history) == 0: # call/bet
-# 				actions.remove('k') # You cannot check
-# 				return actions
-
-# 			# big blind to act
-# 			elif len(current_game_stage_history) == 1: # 2-bet
-# 				if (current_game_stage_history[0] == 'c'): # Small blind called, you don't need to fold
-# 					actions.remove('f')
-# 					return actions
-# 				else: # Other player has bet, so you cannot check
-# 					actions.remove('k')
-# 					return actions
-# 			elif len(current_game_stage_history) == 2: # 3-bet
-# 				# You cannot check at this point
-# 				actions = ['b1', 'all-in', 'c', 'f']
-
-# 			elif len(current_game_stage_history) == 3: # 4-bet
-# 				actions = ['all-in', 'c', 'f']
-
-# 		else: # flop, turn, river
-# 			if len(current_game_stage_history == 0):
-# 				actions.remove('f') # You cannot fold
-# 			elif len(current_game_stage_history) == 1:
-# 				if current_game_stage_history[0] == 'k':
-# 					actions.remove('f')
-# 				else: # Opponent has bet, so you cannot check
-# 					actions.remove('k')
-
-# 		return actions
-# 	else:
-# 		raise Exception("Cannot call actions on a terminal history")
-
-
-"""
-CARD ABSTRACTION
-
-Description:
-We the equity of a given hand / paired with a board, the EHS of a pair of cards 
-at different stages of the game, which is calculated assuming a random uniform draw of opponent hands and random uniform rollout of public cards.
-
-It uses a simple Monte-Carlo method, which samples lots of hands. Over lots of iterations, it will converge 
-to the expected hand strength. To have a descriptive description of the potential of a hand, I use
-an equity distribution rather than a scalar value. This idea was taken from this paper: https://www.cs.cmu.edu/~sandholm/potential-aware_imperfect-recall.aaai14.pdf
-
-This kind of abstraction is used by all superhuman Poker AIs.
-
-We can cluster hands using K-Means to cluster hands of similar distance. The distance metric used is Earth Mover's 
-Distance, which is taken from the Python Optiaml Transport Library.
-
-How do I find the optimal number of clusters?
-
-
-"""
-from functools import partial
-import numpy as np
-import torch
 from tqdm import tqdm
+from fast_evaluator import phEvaluatorSetup
+import argparse
+from sklearn.cluster import KMeans
+
+USE_KMEANS = False  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
+NUM_FLOP_CLUSTERS = 10
+NUM_TURN_CLUSTERS = 10
+NUM_RIVER_CLUSTERS = 10
+
+if USE_KMEANS:
+    # See `notebook/abstraction_exploration.ipynb` for some exploration of how many clusters to use
+    NUM_FLOP_CLUSTERS = 50
+    NUM_TURN_CLUSTERS = 50
+    NUM_RIVER_CLUSTERS = 10  # For river, you can just compute equity
+    load_kmeans_classifiers()
+
+
+def evaluate_winner(board, player_hand, opponent_hand):
+    p1_score = evaluate_cards(*(board + player_hand))
+    p2_score = evaluate_cards(*(board + opponent_hand))
+    if p1_score < p2_score:
+        return 1
+    elif p1_score > p2_score:
+        return -1
+    else:
+        return 0
+
+
+# ----- Load the pre-generated dataset -----
+def load_dataset(batch=0):
+    global boards, player_hands, opponent_hands
+    global player_flop_clusters, player_turn_clusters, player_river_clusters
+    global opp_flop_clusters, opp_turn_clusters, opp_river_clusters
+    global winners
+
+    # Load the pre-generated dataset
+    boards = np.load(f"dataset/boards_{batch}.npy").tolist()
+    player_hands = np.load(f"dataset/player_hands_{batch}.npy").tolist()
+    opponent_hands = np.load(f"dataset/opponent_hands_{batch}.npy").tolist()
+
+    # Load player clusters
+    player_flop_clusters = np.load(f"dataset/player_flop_clusters_{batch}.npy").tolist()
+    player_turn_clusters = np.load(f"dataset/player_turn_clusters_{batch}.npy").tolist()
+    player_river_clusters = np.load(f"dataset/player_river_clusters_{batch}.npy").tolist()
+
+    # Load opponent clusters
+    opp_flop_clusters = np.load(f"dataset/opp_flop_clusters_{batch}.npy").tolist()
+    opp_turn_clusters = np.load(f"dataset/opp_turn_clusters_{batch}.npy").tolist()
+    opp_river_clusters = np.load(f"dataset/opp_river_clusters_{batch}.npy").tolist()
+
+    winners = np.load(f"dataset/winners_{batch}.npy")
+
+    if max(player_flop_clusters) != NUM_FLOP_CLUSTERS - 1:
+        raise ValueError(
+            f"Expected {NUM_FLOP_CLUSTERS} clusters for player flop clusters, got {max(player_flop_clusters) + 1}"
+        )
+    if max(player_turn_clusters) != NUM_TURN_CLUSTERS - 1:
+        raise ValueError(
+            f"Expected {NUM_TURN_CLUSTERS} clusters for player turn clusters, got {max(player_turn_clusters) + 1}"
+        )
+    if max(player_river_clusters) != NUM_RIVER_CLUSTERS - 1:
+        raise ValueError(
+            f"Expected {NUM_RIVER_CLUSTERS} clusters for player river clusters, got {max(player_river_clusters) + 1}"
+        )
+    if max(opp_flop_clusters) != NUM_FLOP_CLUSTERS - 1:
+        raise ValueError(
+            f"Expected {NUM_FLOP_CLUSTERS} clusters for opponent flop clusters, got {max(opp_flop_clusters) + 1}"
+        )
+    if max(opp_turn_clusters) != NUM_TURN_CLUSTERS - 1:
+        raise ValueError(
+            f"Expected {NUM_TURN_CLUSTERS} clusters for opponent turn clusters, got {max(opp_turn_clusters) + 1}"
+        )
+    if max(opp_river_clusters) != NUM_RIVER_CLUSTERS - 1:
+        raise ValueError(
+            f"Expected {NUM_RIVER_CLUSTERS} clusters for opponent river clusters, got {max(opp_river_clusters) + 1}"
+        )
+
+
+# ----- Generate a dataset with associated clusters -----
+def generate_dataset(num_samples=50000, batch=0, save=True):
+    """
+    To make things faster, we pre-generate the boards and hands. We also pre-cluster the hands
+    """
+    global boards, player_hands, opponent_hands
+    global player_flop_clusters, player_turn_clusters, player_river_clusters
+    global opp_flop_clusters, opp_turn_clusters, opp_river_clusters
+    global winners
+
+    boards, player_hands, opponent_hands = phEvaluatorSetup(num_samples)
+
+    np_boards = np.array(boards)
+    np_player_hands = np.array(player_hands)
+    np_opponent_hands = np.array(opponent_hands)
+
+    player_flop_cards = np.concatenate((np_player_hands, np_boards[:, :3]), axis=1).tolist()
+    player_turn_cards = np.concatenate((np_player_hands, np_boards[:, :4]), axis=1).tolist()
+    player_river_cards = np.concatenate((np_player_hands, np_boards), axis=1).tolist()
+    opp_flop_cards = np.concatenate((np_opponent_hands, np_boards[:, :3]), axis=1).tolist()
+    opp_turn_cards = np.concatenate((np_opponent_hands, np_boards[:, :4]), axis=1).tolist()
+    opp_river_cards = np.concatenate((np_opponent_hands, np_boards), axis=1).tolist()
+
+    print("generating clusters")
+
+    player_flop_clusters = Parallel(n_jobs=-1)(
+        delayed(predict_cluster)(cards) for cards in tqdm(player_flop_cards)
+    )
+    player_turn_clusters = Parallel(n_jobs=-1)(
+        delayed(predict_cluster)(cards) for cards in tqdm(player_turn_cards)
+    )
+    player_river_clusters = Parallel(n_jobs=-1)(
+        delayed(predict_cluster)(cards) for cards in tqdm(player_river_cards)
+    )
+
+    opp_flop_clusters = Parallel(n_jobs=-1)(
+        delayed(predict_cluster)(cards) for cards in tqdm(opp_flop_cards)
+    )
+    opp_turn_clusters = Parallel(n_jobs=-1)(
+        delayed(predict_cluster)(cards) for cards in tqdm(opp_turn_cards)
+    )
+    opp_river_clusters = Parallel(n_jobs=-1)(
+        delayed(predict_cluster)(cards) for cards in tqdm(opp_river_cards)
+    )
+
+    winners = Parallel(n_jobs=-1)(
+        delayed(evaluate_winner)(board, player_hand, opponent_hand)
+        for board, player_hand, opponent_hand in tqdm(zip(boards, player_hands, opponent_hands))
+    )
+
+    if save:
+        print("saving datasets")
+        np.save(f"dataset/boards_{batch}.npy", boards)
+        np.save(f"dataset/player_hands_{batch}.npy", player_hands)
+        np.save(f"dataset/opponent_hands_{batch}.npy", opponent_hands)
+        np.save(f"dataset/winners_{batch}.npy", winners)
+        print("continuing to save datasets")
+
+        np.save(f"dataset/player_flop_clusters_{batch}.npy", player_flop_clusters)
+        np.save(f"dataset/player_turn_clusters_{batch}.npy", player_turn_clusters)
+        np.save(f"dataset/player_river_clusters_{batch}.npy", player_river_clusters)
+
+        np.save(f"dataset/opp_flop_clusters_{batch}.npy", opp_flop_clusters)
+        np.save(f"dataset/opp_turn_clusters_{batch}.npy", opp_turn_clusters)
+        np.save(f"dataset/opp_river_clusters_{batch}.npy", opp_river_clusters)
 
 
 # Preflop Abstraction with 169 buckets (lossless abstraction)
@@ -226,14 +249,6 @@ def get_preflop_cluster_id(two_cards_string):  # Lossless abstraction for pre-fl
     assert cluster_id >= 1 and cluster_id <= 169
 
     return cluster_id
-
-
-# Post-Flop Abstraction using Equity Distributions
-def create_abstraction_folders():
-    if not os.path.exists("../data"):
-        for split in ["clusters", "raw"]:
-            for stage in ["flop", "turn", "river"]:
-                os.makedirs(f"../data/{split}/{stage}")
 
 
 def calculate_equity(player_cards: List[str], community_cards=[], n=2000, timer=False):
@@ -351,18 +366,12 @@ def plot_equity_hist(equity_hist, player_cards=None, community_cards=None):
     plt.pause(0.2)
 
 
-"""
-The Algorithm: 
-1. For river, generate 5000 clusters, each representing a particular equity distribution.
-2. For turn, generate 5000 clusters which are potential-aware, meaning it takes into consideration
-the probability of transitioning into the next clusters (of the river).
-
-So if you draw the river card, what is the probability you end up in a given river cluster. The river clusters are non 
-overlapping, so you always end up in one.
-
-3. For flop, " " (of the turn)
-4. For pre-flop, generate 169 clusters (lossless abstraction).
-"""
+# Post-Flop Abstraction using Equity Distributions
+def create_abstraction_folders():
+    if not os.path.exists("../data"):
+        for split in ["clusters", "raw"]:
+            for stage in ["flop", "turn", "river"]:
+                os.makedirs(f"../data/{split}/{stage}")
 
 
 def generate_postflop_equity_distributions(
@@ -410,14 +419,6 @@ def generate_postflop_equity_distributions(
         )  # Store the list of hands, so you can associate a particular distribution with a particular hand
 
 
-def visualize_clustering():
-    """Visualization higher dimensional data is super interesting.
-
-    See `notebooks/abstraction_visualization.ipynb`
-    """
-    return
-
-
 def get_filenames(folder, extension=".npy"):
     filenames = []
 
@@ -431,10 +432,8 @@ def get_filenames(folder, extension=".npy"):
 
 def predict_cluster_kmeans(kmeans_classifier, cards, n=200):
     """cards is a list of cards"""
-    print(cards)
+    assert type(cards) == list
     equity_distribution = calculate_equity_distribution(cards[:2], cards[2:], n=n)
-    equity = calculate_equity(cards[:2], cards[2:], n=1000)
-    print(equity_distribution)
     print(
         "averaged historgram: ",
         0.1 * equity_distribution[0]
@@ -443,55 +442,71 @@ def predict_cluster_kmeans(kmeans_classifier, cards, n=200):
         + 0.7 * equity_distribution[3]
         + 0.9 * equity_distribution[4],
     )
-    print(equity)
     y = kmeans_classifier.predict([equity_distribution])
     assert len(y) == 1
     return y[0]
 
 
+def predict_cluster(cards):
+    assert type(cards) == list
+
+    if USE_KMEANS:
+        if len(cards) == 5:  # flop
+            return predict_cluster_kmeans(kmeans_flop, cards)
+        elif len(cards) == 6:  # turn
+            return predict_cluster_kmeans(kmeans_turn, cards)
+        elif len(cards) == 7:  # river
+            return predict_cluster_fast(cards, total_clusters=NUM_RIVER_CLUSTERS)
+        else:
+            raise ValueError("Invalid number of cards: ", len(cards))
+    else:
+        if len(cards) == 5:  # flop
+            return predict_cluster_fast(cards, total_clusters=NUM_FLOP_CLUSTERS)
+        elif len(cards) == 6:  # turn
+            return predict_cluster_fast(cards, total_clusters=NUM_TURN_CLUSTERS)
+        elif len(cards) == 7:  # river
+            return predict_cluster_fast(cards, total_clusters=NUM_RIVER_CLUSTERS)
+        else:
+            raise ValueError("Invalid number of cards: ", len(cards))
+
+
 def predict_cluster_fast(cards, n=2000, total_clusters=10):
+    assert type(cards) == list
     equity = calculate_equity(cards[:2], cards[2:], n=n)
     cluster = min(total_clusters - 1, int(equity * total_clusters))
     return cluster
 
 
-def batch_predict_clusters(kmeans_classifier, cards_list, n=200):
-    cards_list = np.array(cards_list)
-    # player_cards = cards_list
-    # distribution = calculate_equity_distribution(player_cards, community_cards, bins)
-    # equity_distributions.append(distribution)
-    # hands.append(" ".join(player_cards + community_cards))
-    # return 1
-
-
 def load_kmeans_classifiers():
+    global kmeans_flop, kmeans_turn, kmeans_river
     raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/flop"))
     filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
 
     centroids = joblib.load(f"../data/clusters/flop/{filename}")
-    kmeans_flop = KMeans(100)
+    kmeans_flop = KMeans(NUM_FLOP_CLUSTERS)
     kmeans_flop.cluster_centers_ = centroids
     kmeans_flop._n_threads = -1
 
     raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/turn"))
     filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
     centroids = joblib.load(f"../data/clusters/turn/{filename}")
-    kmeans_turn = KMeans(100)
+    kmeans_turn = KMeans(NUM_TURN_CLUSTERS)
     kmeans_turn.cluster_centers_ = centroids
     kmeans_turn._n_threads = -1
 
     raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/river"))
     filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
     centroids = joblib.load(f"../data/clusters/river/{filename}")
-    kmeans_river = KMeans(100)
+    kmeans_river = KMeans(NUM_RIVER_CLUSTERS)
     kmeans_river.cluster_centers_ = centroids
     kmeans_river._n_threads = -1
 
+    assert(len(kmeans_flop.cluster_centers_) == NUM_FLOP_CLUSTERS)
+    assert(len(kmeans_turn.cluster_centers_) == NUM_TURN_CLUSTERS)
+    assert(len(kmeans_river.cluster_centers_) == NUM_RIVER_CLUSTERS)
+
     return kmeans_flop, kmeans_turn, kmeans_river
 
-
-import argparse
-from sklearn.cluster import KMeans
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Poker Hand Abstractions.")
@@ -532,6 +547,7 @@ if __name__ == "__main__":
     n_samples = int(args.n_samples)
     bins = args.bins
 
+    # TODO: River doesn't really need equity distribution... just calculate equity
     if generate:
         generate_postflop_equity_distributions(n_samples, bins, stage)
 
@@ -546,16 +562,30 @@ if __name__ == "__main__":
         if not os.path.exists(f"../data/clusters/{stage}/{filename}"):
             print(f"Generating the cluster for the {stage}")
             print(filename)
-            kmeans = KMeans(
-                100
-            )  # 100 Clusters seems good using the Elbow Method, see `notebook/abstraction_exploration.ipynb` for more details
+            if stage == "flop":
+                kmeans = KMeans(NUM_FLOP_CLUSTERS)
+            elif stage == "turn":
+                kmeans = KMeans(NUM_TURN_CLUSTERS)
+            elif stage == "river":
+                kmeans = KMeans(NUM_RIVER_CLUSTERS)
+            else:
+                raise ValueError("Invalid stage: ", stage)
+
             kmeans.fit(equity_distributions)  # Perform Clustering
             centroids = kmeans.cluster_centers_
             joblib.dump(centroids, f"../data/clusters/{stage}/{filename}")
         else:  # Centroids have already been generated, just load them, which are tensors
             centroids = joblib.load(f"../data/clusters/{stage}/{filename}")
             # Load KMeans Model
-            kmeans = KMeans(100)
+            if stage == "flop":
+                kmeans = KMeans(NUM_FLOP_CLUSTERS)
+            elif stage == "turn":
+                kmeans = KMeans(NUM_TURN_CLUSTERS)
+            elif stage == "river":
+                kmeans = KMeans(NUM_RIVER_CLUSTERS)
+            else:
+                raise ValueError("Invalid stage: ", stage)
+
             kmeans.cluster_centers_ = centroids
             kmeans._n_threads = -1
 
