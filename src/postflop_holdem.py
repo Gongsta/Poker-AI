@@ -151,6 +151,7 @@ class PostflopHoldemHistory(base.History):
 
     def player(self):
         """
+        # non dealer, dealer
         1. ['AkTh', 'QdKd', '/', 'Qh', 'b2', 'c', '/', '2d', b2', 'f']
         """
         if len(self.history) <= 3:
@@ -204,7 +205,7 @@ class PostflopHoldemHistory(base.History):
         if self.history[-1] == "f":
             pot_size, latest_bet = self._get_total_pot_size(self.history[:-2])
             if self.history[-3] == "bMIN":
-                pot_size += latest_bet  # because I "called this bet", but total pot size did not count this value
+                pot_size += latest_bet  # This is needed to calculate the correct profit
 
             if (
                 len(last_game_stage) % 2 == i
@@ -226,6 +227,8 @@ class PostflopHoldemHistory(base.History):
         total = 0
         stage_total = 4  # assume preflop is a check + call, so 4 in pot (1 BB = 2 chips)
         latest_bet = 0
+
+        # note that this logic works, because I don't allow multiple raises
         for idx, action in enumerate(history):
             if action == "/":
                 total += stage_total
@@ -365,11 +368,13 @@ class PostflopHoldemCFR(base.CFR):
         super().__init__(create_infoSet, create_history, n_players, iterations)
 
 
+import joblib
 if __name__ == "__main__":
     # Train in batches of 50,000 hands
     ITERATIONS = 50000
     cfr = PostflopHoldemCFR(create_infoSet, create_history, iterations=ITERATIONS)
-    for i in range(20):
+    cfr.infoSets = joblib.load("postflop_infoSets_batch_4.joblib")
+    for i in range(5, 20):
         try:
             abstraction.load_dataset(i)
         except Exception as e:
