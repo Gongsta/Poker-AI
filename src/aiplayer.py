@@ -3,6 +3,7 @@ import pyttsx3
 import numpy as np
 from player import Player
 from abstraction import calculate_equity
+from preflop_holdem import PreflopHoldemHistory, PreflopHoldemInfoSet
 from postflop_holdem import PostflopHoldemHistory, PostflopHoldemInfoSet
 import joblib
 import copy
@@ -159,20 +160,18 @@ class EquityAIPlayer(AIPlayer):
             if isDealer:  # If you are the dealer, raise more of the time
                 strategy = {
                     "k": np_strategy[0],
-                    f"b{min(max(BIG_BLIND, int(total_pot_balance / 3)), self.player_balance)}": np_strategy[
+                    f"b{min(max(BIG_BLIND, int(total_pot_balance / 3)), player_balance)}": np_strategy[
                         2
                     ],
-                    f"b{min(total_pot_balance, self.player_balance)}": np_strategy[1],
+                    f"b{min(total_pot_balance, player_balance)}": np_strategy[1],
                 }
             else:
                 strategy = {
                     "k": equity,
-                    f"b{min(total_pot_balance, self.player_balance)}": 1 - equity,
+                    f"b{min(total_pot_balance, player_balance)}": 1 - equity,
                 }
 
         else:  # if there is a bet already
-            # TODO: calculate proportional to bet size. i mean, it just does it according to bet size
-            # normalize the strategy
             if checkAllowed:
                 strategy = {
                     "k": np_strategy[0],
@@ -192,10 +191,10 @@ class EquityAIPlayer(AIPlayer):
                         f"b{min(2 * highest_current_bet, player_balance)}": np_strategy[2],
                     }
 
-        print(card_str, community_cards)
-        print(highest_current_bet)
-        print("equity", equity)
-        print("AI strategy ", strategy)
+        # renormalize the strategy in case of duplicates
+        total = sum(strategy.values())
+        for key in strategy:
+            strategy[key] /= total
         action = getAction(strategy)
         return action
 
@@ -204,7 +203,145 @@ class CFRAIPlayer(AIPlayer):
     def __init__(self, balance) -> None:
         super().__init__(balance)
 
-        self.postflop_infosets = joblib.load("../src/postflop_infoSets_batch_0.joblib")
+        self.preflop_infosets = joblib.load("../src/preflop_infoSets_batch_19.joblib")
+        self.postflop_infosets = joblib.load("../src/postflop_infoSets_batch_19.joblib")
+
+    def place_bet(self, observed_env):
+        card_str = [str(card) for card in self.hand]
+        community_cards = [str(card) for card in observed_env.community_cards]
+
+        isDealer = self == observed_env.get_player(observed_env.dealer_button_position)
+        checkAllowed = "k" in observed_env.valid_actions()
+
+        action = self.get_action(
+            observed_env.history,
+            card_str,
+            community_cards,
+            observed_env.get_highest_current_bet(),
+            observed_env.stage_pot_balance,
+            observed_env.total_pot_balance,
+            self.player_balance,
+            observed_env.BIG_BLIND,
+            isDealer,
+            checkAllowed,
+        )
+        self.process_action(action, observed_env)  # use voice activation
+        return action
+
+    def get_action(
+        self,
+        history,
+        card_str,
+        community_cards,
+        highest_current_bet,
+        stage_pot_balance,
+        total_pot_balance,
+        player_balance,
+        BIG_BLIND,
+        isDealer,
+        checkAllowed,
+    ):
+
+        # Bet sizing uses the pot balance
+        # stage_pot_balance used for preflop, total_pot_balance used for postflop
+
+        HEURISTICS = False # trying this in case my preflop strategy sucks
+        if len(community_cards) == 0:  # preflop
+            if HEURISTICS:
+                player = EquityAIPlayer(self.player_balance)
+                action = player.get_action(
+                    card_str,
+                    community_cards,
+                    total_pot_balance,
+                    highest_current_bet,
+                    BIG_BLIND,
+                    player_balance,
+                    isDealer,
+                    checkAllowed,
+                )
+            else:
+                abstracted_history = self.perform_preflop_abstraction(history, BIG_BLIND=BIG_BLIND)
+                infoset_key = "".join(PreflopHoldemHistory(abstracted_history).get_infoSet_key())
+                strategy = self.preflop_infosets[infoset_key].get_average_strategy()
+                action = getAction(strategy)
+                print("Abstracted action: ", action)
+                if action == "bMIN":
+                    action = "b" + str(max(BIG_BLIND, int(stage_pot_balance)))
+                elif action == "bMID":
+                    action = "b" + str(max(BIG_BLIND, 2 * int(stage_pot_balance)))
+                elif (
+                    action == "bMAX"
+                ):  # in training, i have it set to all in... but wiser to 4x pot?
+                    action = "b" + str(min(player_balance, 4 * int(stage_pot_balance)))
+        else:
+            print("history: ", history)
+            abstracted_history = self.perform_postflop_abstraction(
+                history, BIG_BLIND=BIG_BLIND
+            )  # condense down bet sequencing
+            infoset_key = PostflopHoldemHistory(abstracted_history).get_infoSet_key_online()
+            strategy = self.postflop_infosets[infoset_key].get_average_strategy()
+            action = getAction(strategy)
+            print("Abstracted action: ", action)
+            if action == "bMIN":
+                action = "b" + str(max(BIG_BLIND, int(1 / 3 * total_pot_balance)))
+            elif action == "bMAX":
+                action = "b" + str(min(total_pot_balance, player_balance))
+
+        if not HEURISTICS:
+            print("Abstracted history: ", abstracted_history)
+            print("Infoset key: ", infoset_key)
+            print("AI strategy ", strategy)
+
+        print("Action selected", action)
+
+        return action
+
+    def perform_preflop_abstraction(self, history, BIG_BLIND=2):
+        stage = copy.deepcopy(history)
+        abstracted_history = stage[:2]
+        if (
+            len(stage) >= 6 and stage[3] != "c"  # bet seqeuence of length 4
+        ):  # length 6 that isn't a call, we need to condense down
+            if len(stage) % 2 == 0:
+                abstracted_history += ["bMAX"]
+            else:
+                abstracted_history += ["bMIN", "bMAX"]
+        else:
+            bet_size = BIG_BLIND
+            pot_total = 3
+            for i, action in enumerate(stage[2:]):
+                if action[0] == "b":
+                    bet_size = int(action[1:])
+
+                    # this is a raise on a small bet
+                    if abstracted_history[-1] == "bMIN":
+                        if bet_size <= 2 * pot_total:
+                            abstracted_history += ["bMID"]
+                        else:
+                            abstracted_history += ["bMAX"]
+                    elif abstracted_history[-1] == "bMID":
+                        abstracted_history += ["bMAX"]
+                    elif abstracted_history[-1] == "bMAX":
+                        if abstracted_history[-2] == "bMID":
+                            abstracted_history[-2] = "bMIN"
+                        abstracted_history[-1] = "bMID"
+                        abstracted_history += ["bMAX"]
+                    else:  # first bet
+                        if bet_size <= pot_total:
+                            abstracted_history += ["bMIN"]
+                        elif bet_size <= 2 * pot_total:
+                            abstracted_history += ["bMID"]
+                        else:
+                            abstracted_history += ["bMAX"]
+
+                    pot_total += bet_size
+
+                elif action == "c":
+                    pot_total = 2 * bet_size
+                    abstracted_history += ["c"]
+                else:
+                    abstracted_history += [action]
+        return abstracted_history
 
     def perform_postflop_abstraction(self, history, BIG_BLIND=2):
         history = copy.deepcopy(history)
@@ -219,12 +356,12 @@ class CFRAIPlayer(AIPlayer):
 
         # ------- Remove preflop actions + bet abstraction -------
         abstracted_history = history[:2]
+        # swap dealer and small blind positions for abstraction
         stage_start = flop_start
         stage = self.get_stage(history[stage_start + 1 :])
         latest_bet = 0
         while True:
             abstracted_history += ["/"]
-
             if (
                 len(stage) >= 4 and stage[3] != "c"
             ):  # length 4 that isn't a call, we need to condense down
@@ -238,24 +375,33 @@ class CFRAIPlayer(AIPlayer):
                             abstracted_history += ["k", "bMAX", "c"]
                         else:
                             abstracted_history += ["bMIN", "bMAX", "c"]
+                else:
+                    if len(stage) % 2 == 0:
+                        abstracted_history += ["bMAX"]
+                    else:
+                        abstracted_history += ["bMIN", "bMAX"]
             else:
                 for i, action in enumerate(stage):
                     if action[0] == "b":
                         bet_size = int(action[1:])
                         latest_bet = bet_size
-                        pot_total += bet_size
 
                         # this is a raise on a small bet
                         if abstracted_history[-1] == "bMIN":
                             abstracted_history += ["bMAX"]
                         # this is a raise on a big bet
-                        elif abstracted_history[-1] == "bMAX":
-                            abstracted_history[-1] = "k"  # turn into a check
+                        elif (
+                            abstracted_history[-1] == "bMAX"
+                        ):  # opponent raised, first bet must be bMIN
+                            abstracted_history[-1] = "bMIN"
+                            abstracted_history += ["bMAX"]
                         else:  # first bet
                             if bet_size >= pot_total:
                                 abstracted_history += ["bMAX"]
                             else:
                                 abstracted_history += ["bMIN"]
+
+                        pot_total += bet_size
 
                     elif action == "c":
                         pot_total += latest_bet
@@ -276,58 +422,3 @@ class CFRAIPlayer(AIPlayer):
             return history[: history.index("/")]
         else:
             return history
-
-    def place_bet(self, observed_env):
-        action = self.get_action()
-        self.process_action(action, observed_env)  # use voice activation
-        return action
-
-    def get_action(
-        self,
-        history,
-        card_str,
-        community_cards,
-        total_pot_balance,
-        player_balance,
-        BIG_BLIND,
-        isDealer,
-        checkAllowed,
-    ):
-        if len(community_cards) == 0:  # preflop
-            if checkAllowed:
-                action = "k"
-            else:
-                action = "c"
-        else:
-            print("history: ", history)
-            abstracted_history = self.perform_postflop_abstraction(history, BIG_BLIND=BIG_BLIND)
-            print("Abstracted history: ", abstracted_history)
-            infoset_key = PostflopHoldemHistory(abstracted_history).get_infoSet_key_online()
-            print("Infoset key: ", infoset_key)
-            strategy = self.postflop_infosets[infoset_key].get_average_strategy()
-            print(infoset_key)
-            print("AI strategy ", strategy)
-            action = getAction(strategy)
-            if action == "bMIN":
-                action = "b" + str(max(BIG_BLIND, int(1 / 3 * total_pot_balance)))
-            elif action == "bMAX":
-                action = "b" + str(min(total_pot_balance, player_balance))
-
-        return action
-
-
-# def load_holdem_infosets():
-#     print("loading holdem infosets")
-#     global holdem_infosets
-#     # holdem_infosets = joblib.load("../src/infoSets_100.joblib")
-#     holdem_infosets = joblib.load("../src/infoSets_0.joblib")
-#     print("loaded holdem infosets!")
-
-
-# def get_infoset(infoSet_key):
-#     print("getting infoset", infoSet_key)
-#     key = "".join(infoSet_key)
-#     if key in holdem_infosets:
-#         return holdem_infosets[key]
-#     else:
-#         return None

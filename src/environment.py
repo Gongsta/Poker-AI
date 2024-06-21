@@ -2,6 +2,7 @@
 from evaluator import *
 from typing import List
 from player import Player
+from preflop_holdem import PreflopHoldemHistory, PreflopHoldemInfoSet
 from postflop_holdem import PostflopHoldemHistory, PostflopHoldemInfoSet
 from aiplayer import CFRAIPlayer
 
@@ -228,7 +229,9 @@ class PokerEnvironment:
             self.position_in_play = (self.dealer_button_position + 3) % len(self.players)
         self.raise_position = self.position_in_play
 
-        for player_idx in range(len(self.players)):
+        for i in range(len(self.players)):
+            # First card is non-dealer, second is dealer
+            player_idx = (self.dealer_button_position + 1 + i) % len(self.players)
             card_str = ""
             for i in range(2):
                 if self.INPUT_CARDS and player_idx == 0:
@@ -239,7 +242,7 @@ class PokerEnvironment:
                 card_str += str(card)
                 self.players[player_idx].add_card_to_hand(card)
 
-            self.history += [card_str]
+            self.history += [card_str] # always deal to the non-dealer first
 
     def play_flop(self):
         self.deck.draw()  # We must first burn one card, TODO: Show on video

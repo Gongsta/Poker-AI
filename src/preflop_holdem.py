@@ -11,6 +11,7 @@ Preflop is weird because the dealer calls, but the round isn't over...
 
 import base
 from base import Player, Action
+import abstraction
 from typing import List
 from abstraction import (
     get_preflop_cluster_id,
@@ -93,7 +94,7 @@ class PreflopHoldemHistory(base.History):
             - k ("check")
             - bMIN ("bet pot")
             - bMID ("bet 2x pot size")
-            - bMAX ("bet all in")
+            - bMAX ("bet 4x pot size")
             - c ("call")
             - f ("fold")
 
@@ -117,7 +118,7 @@ class PreflopHoldemHistory(base.History):
             elif self.history[-1] == "bMAX":
                 return ["f", "c"]
             else:
-                return ["k", "bMIN", "bMID, bMAX"]
+                return ["k", "bMIN", "bMID", "bMAX"]
 
         else:
             raise Exception("Cannot call actions on a terminal history")
@@ -200,8 +201,9 @@ class PreflopHoldemHistory(base.History):
                 stage_total = latest_bet + 2 * stage_total  # bet 2x pot
                 latest_bet = 2 * old_stage_total
             elif action == "bMAX":
-                stage_total = latest_bet + 100  # bet all in
-                latest_bet = 100
+                old_stage_total = stage_total
+                stage_total = latest_bet + 4 * stage_total  # bet all in
+                latest_bet = 4 * old_stage_total
             elif action == "c":
                 stage_total = 2 * latest_bet  # call
 
@@ -283,7 +285,6 @@ def evaluate_winner(board, player_hand, opponent_hand):
         return 0
 
 
-import abstraction
 
 if __name__ == "__main__":
     # Train in batches of 50,000 hands
@@ -295,7 +296,7 @@ if __name__ == "__main__":
         except Exception as e:
             print("Got error loading dataset: ", e)
             print("Generating new dataset")
-            abstraction.generate_dataset(i)
+            abstraction.generate_dataset(batch=i)
 
         # ----- Load the variables locally -----
         boards = abstraction.boards

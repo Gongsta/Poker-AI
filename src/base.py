@@ -191,7 +191,7 @@ class CFR:
         # Return payoff for terminal states
         if history.is_terminal():
             if debug:
-                print(f"history: {history.history} utility: {history.terminal_utility(i)}")
+                print(f"history: {history.history} utility: {history.terminal_utility(i)}, player: {i}")
                 time.sleep(0.1)
             return history.terminal_utility(i)
         elif history.is_chance():

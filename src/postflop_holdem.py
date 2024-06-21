@@ -42,7 +42,6 @@ This keeps it manageable for training.
 """
 
 import base
-import numpy as np
 from base import Player, Action
 from typing import List
 from abstraction import predict_cluster
@@ -368,19 +367,17 @@ class PostflopHoldemCFR(base.CFR):
         super().__init__(create_infoSet, create_history, n_players, iterations)
 
 
-import joblib
 if __name__ == "__main__":
     # Train in batches of 50,000 hands
     ITERATIONS = 50000
     cfr = PostflopHoldemCFR(create_infoSet, create_history, iterations=ITERATIONS)
-    cfr.infoSets = joblib.load("postflop_infoSets_batch_4.joblib")
-    for i in range(5, 20):
+    for i in range(20):
         try:
             abstraction.load_dataset(i)
         except Exception as e:
             print("Got error loading dataset: ", e)
             print("Generating new dataset")
-            abstraction.generate_dataset(i)
+            abstraction.generate_dataset(batch=i)
 
         # ----- Load the variables locally -----
         boards = abstraction.boards

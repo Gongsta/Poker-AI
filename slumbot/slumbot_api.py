@@ -45,7 +45,7 @@ Actions Explained:
 The / represents the transition between each game stage, i.e. pre-flop/flop/turn/river.
 Example of a game sequence that reaches showdown: cb300c/kk/kb300c/kb1200c
 """
-
+import numpy as np
 import requests
 import sys
 import argparse
@@ -54,6 +54,11 @@ import joblib
 from tqdm import tqdm
 
 sys.path.append("../src")
+
+from aiplayer import EquityAIPlayer, CFRAIPlayer
+from preflop_holdem import PreflopHoldemInfoSet, PreflopHoldemHistory
+from postflop_holdem import PostflopHoldemInfoSet, PostflopHoldemHistory
+
 
 from abstraction import (
     calculate_equity,
@@ -69,23 +74,26 @@ Here are the strategies that we want to test out. Since Poker is high variance, 
 - (Strategy 1) Only play the hands where you have over 50% chance of winning using my `calculate_equity` function
 - (Strategy 2) Use the CFR algorithm
 """
-STRATEGY = 0  # SET THE STRATEGY HERE
+STRATEGY = 4  # SET THE STRATEGY HERE
 
+player = None
 if STRATEGY == 0:
+    USERNAME = "all-in"
+    PASSWORD = "all-in"
+if STRATEGY == 1:
     USERNAME = "calling_station"
     PASSWORD = "calling_station"
-elif STRATEGY == 1:
+elif STRATEGY == 2:
     USERNAME = "dumb_equity"
     PASSWORD = "dumb_equity"
-elif STRATEGY == 2:
+elif STRATEGY == 3:
     USERNAME = "smart_equity"
     PASSWORD = "smart_equity"
-elif STRATEGY == 3:
+    player = EquityAIPlayer(20000)
+elif STRATEGY == 4:
     USERNAME = "cfr_abstraction"
     PASSWORD = "cfr_abstraction"
-elif STRATEGY == 4:
-    USERNAME = "preflop"
-
+    player = CFRAIPlayer(20000)
 # if os.path.exists(f"../data/slumbot/{USERNAME}.joblib"):  # Load previous history if it exists
 #     history = joblib.load(f"../data/slumbot/{USERNAME}.joblib")
 
@@ -317,86 +325,109 @@ def Act(token, action):
     return r
 
 
-from aiplayer import getAction
-import numpy as np
-
-
 def ComputeStrategy(hole_cards, board, action, strategy=STRATEGY):
     a = ParseAction(action)
 
-    if strategy == 0:  # always check or call
+    player_balance = 20000 - (a["total_last_bet_to"] - a["street_last_bet_to"])
+    total_pot_balance = 2 * a["total_last_bet_to"]
+    stage_pot_balance = total_pot_balance
+    highest_current_bet = a["street_last_bet_to"]
+    BIG_BLIND = 100
+    card_str = hole_cards
+    community_cards = board
+    isDealer = a["pos"] == 1
+    checkAllowed = a["last_bettor"] == -1
+
+    history = convert_action_to_history(hole_cards, board, action, isDealer)
+    print(history)
+
+    if strategy == 0:  # all-in
+        incr = "b20000"
+    elif strategy == 1:  # always check or call
         if a["last_bettor"] == -1:  # no one has bet yet
             incr = "k"
         else:  # opponent has bet, so simply call
             incr = "c"
-    elif strategy == 1:
-            equity = calculate_equity(hole_cards, board, n=5000)
-            print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
-            if a["last_bettor"] == -1:
-                if equity >= 0.5:
-                    incr = "b1000"
-                else:
-                    incr = "k"
-            else:
-                if equity >= 0.5:
-                    incr = "c"
-                else:
-                    incr = "f"
     elif strategy == 2:
-        card_str = hole_cards
-        community_cards = board
-        # if observed_env.game_stage == 2:
-        equity = calculate_equity(card_str, community_cards)
-
-        # fold, check / call, raise
-        np_strategy = np.abs(np.array([1.0 - (equity + equity / 2.0), equity, equity / 2.0]))
-        np_strategy = np_strategy / np.sum(np_strategy)  # normalize
-        remaining = 20000 - (a["total_last_bet_to"] - a["street_last_bet_to"])
-
-        if a["street_last_bet_to"] == 0:  # no bet placed
-            if a["pos"] == 1:  # If you are the dealer, raise more of the time
-                strategy = {
-                    "k": np_strategy[0],
-                    f"b{min(100, remaining)}": np_strategy[2],
-                    f"b{min(2 * a['total_last_bet_to'], remaining)}": np_strategy[1],  # pot-size
-                }
+        equity = calculate_equity(hole_cards, board, n=5000)
+        if a["last_bettor"] == -1:
+            if equity >= 0.5:
+                incr = "b1000"
             else:
-                strategy = {
-                    "k": equity,
-                    f"b{min(2 * a['total_last_bet_to'], remaining)}": 1 - equity,
-                }
-
-        else:  # if there is a bet already
-            # TODO: calculate proportional to bet size
-            # normalize the strategy
-            if a["last_bettor"] == -1:  # You can check
-                strategy = {
-                    "k": np_strategy[0],
-                    f"b{min(int(1.5 * a['street_last_bet_to']), remaining)}": np_strategy[1],
-                    f"b{min(2 *a['street_last_bet_to'], remaining)}": np_strategy[2],
-                }
+                incr = "k"
+        else:
+            if equity >= 0.5:
+                incr = "c"
             else:
-                if remaining == a["street_last_bet_to"]:
-                    strategy = {
-                        "f": np_strategy[0],
-                        "c": np_strategy[1] + np_strategy[2],
-                    }
-                else:
-                    strategy = {
-                        "f": np_strategy[0],
-                        "c": np_strategy[1],
-                        f"b{min(2 * a['street_last_bet_to'], remaining)}": np_strategy[2],
-                    }
+                incr = "f"
+    elif strategy == 3:
+        incr = player.get_action(
+            card_str,
+            community_cards,
+            total_pot_balance,
+            highest_current_bet,
+            BIG_BLIND,
+            player_balance,
+            isDealer,
+            checkAllowed,
+        )
 
-        print(action, a)
-        print(card_str, community_cards)
-        print("equity", equity)
-        print("AI strategy ", strategy)
-        incr = getAction(strategy)
-        print("decision", incr)
-        print("")
+    elif strategy == 4:
+        # ck/kk/kb100c/kb100b400
+        # convert this to a infoset, use the environment
+        incr = player.get_action(
+            history,
+            card_str,
+            community_cards,
+            highest_current_bet,
+            stage_pot_balance,
+            total_pot_balance,
+            player_balance,
+            BIG_BLIND,
+            isDealer,
+            checkAllowed,
+        )
 
     return incr
+
+
+def convert_action_to_history(hole_cards, board, action, isDealer):
+    DISCRETE_ACTIONS = ["k", "c", "/"]
+    stage_i = 0
+    if isDealer:
+        history = ["2s2h", "".join(hole_cards)]
+    else:
+        history = ["".join(hole_cards), "2s2h"]
+
+    i = 0
+    while i < len(action):
+        a = action[i]
+
+        if a in DISCRETE_ACTIONS:
+            if a == "/":
+                history += ["/"]
+                stage_i += 1
+                if stage_i == 1:
+                    history += ["".join(board[:3])]
+                elif stage_i == 2:
+                    history += ["".join(board[3])]
+                else:
+                    history += ["".join(board[4])]
+
+            else:
+                history += [a]
+            i += 1
+
+        else:
+            j = i
+            while j < len(action):
+                if action[j] in DISCRETE_ACTIONS or (j != i and action[j] == "b"):
+                    break
+                j += 1
+
+            history += [action[i:j]]
+            i = j
+    return history
 
 
 def PlayHand(token, debug=False):
@@ -419,6 +450,7 @@ def PlayHand(token, debug=False):
         hole_cards = r.get("hole_cards")
         board = r.get("board")
         winnings = r.get("winnings")
+        baseline_winnings = r.get("baseline_winnings")
         if debug:
             print("Action: %s" % action)
             if client_pos:
@@ -427,14 +459,16 @@ def PlayHand(token, debug=False):
             print("Board: %s" % repr(board))
         if winnings is not None:
             print("Hand winnings: %i" % winnings)
-            return (token, winnings)
+            return (token, winnings, baseline_winnings)
         # Need to check or call
         a = ParseAction(
             action
         )  # Ex: {'st': 0, 'pos': 1, 'street_last_bet_to': 100, 'total_last_bet_to': 100, 'last_bet_size': 50, 'last_bettor': 0}
         if "error" in a:
             print("Error parsing action %s: %s" % (action, a["error"]))
-            sys.exit(-1)
+            print(a)
+            return (token, 0, 0)
+            sys.exit(-1)  # don't exit, just don't consider this round
 
         incr = ComputeStrategy(hole_cards, board, action)
         if debug:
@@ -492,24 +526,31 @@ def main():
     #   import urllib3
     #   urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     num_hands = 10000
-    winnings = 0
     winnings_history = []
+    baseline_winnings_history = []
+    # winnings_history = joblib.load(f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}_raw.joblib")
+    # baseline_winnings_history = joblib.load(
+    #     f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}_baseline.joblib"
+    # )
+    winnings = winnings_history[-1] if len(winnings_history) > 0 else 0
+    baseline_winnings = baseline_winnings_history[-1] if len(baseline_winnings_history) > 0 else 0
 
     for h in tqdm(range(num_hands)):
-        try:
-            (token, hand_winnings) = PlayHand(token)
-            winnings += hand_winnings
-            winnings_history.append(winnings)
-            if h % 1000 == 0:
-                joblib.dump(
-                    winnings_history, f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}.joblib"
-                )
-                #     print(history)
-        except Exception as e:
-            print(e)
-            num_hands += 1
+        (token, hand_winnings, baseline_hand_winnings) = PlayHand(token)
+        winnings += hand_winnings
+        baseline_winnings += baseline_hand_winnings
+        winnings_history.append(winnings)
+        baseline_winnings_history.append(baseline_winnings)
+        if (h + 1) % 1000 == 0:
+            joblib.dump(
+                winnings_history, f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}_raw.joblib"
+            )
+            joblib.dump(
+                baseline_winnings_history,
+                f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}_baseline.joblib",
+            )
+            #     print(history)
 
-    joblib.dump(winnings_history, f"../results/slumbot_strategy_{STRATEGY}_{USERNAME}.joblib")
     print("Total winnings: %i" % winnings)
 
 

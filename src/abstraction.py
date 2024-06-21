@@ -167,7 +167,6 @@ def generate_dataset(num_samples=50000, batch=0, save=True):
         np.save(f"dataset/player_hands_{batch}.npy", player_hands)
         np.save(f"dataset/opponent_hands_{batch}.npy", opponent_hands)
         np.save(f"dataset/winners_{batch}.npy", winners)
-        print("continuing to save datasets")
 
         np.save(f"dataset/player_flop_clusters_{batch}.npy", player_flop_clusters)
         np.save(f"dataset/player_turn_clusters_{batch}.npy", player_turn_clusters)
