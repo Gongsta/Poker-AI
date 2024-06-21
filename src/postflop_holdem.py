@@ -197,13 +197,18 @@ class PostflopHoldemHistory(base.History):
 
         winner = winners[self.sample_id]
 
-        pot_size = self._get_total_pot_size(self.history)
+        pot_size, _ = self._get_total_pot_size(self.history)
 
         last_game_stage = self.get_last_game_stage()
 
         if self.history[-1] == "f":
-            pot_size = self._get_total_pot_size(self.history[:-2])
-            if len(last_game_stage) % 2 == i:
+            pot_size, latest_bet = self._get_total_pot_size(self.history[:-2])
+            if self.history[-3] == "bMIN":
+                pot_size += latest_bet  # because I "called this bet", but total pot size did not count this value
+
+            if (
+                len(last_game_stage) % 2 == i
+            ):  # this isn't perfectly exact, but it's an approximation
                 return -pot_size / 2
             else:
                 return pot_size / 2
@@ -220,24 +225,23 @@ class PostflopHoldemHistory(base.History):
     def _get_total_pot_size(self, history):
         total = 0
         stage_total = 4  # assume preflop is a check + call, so 4 in pot (1 BB = 2 chips)
+        latest_bet = 0
         for idx, action in enumerate(history):
             if action == "/":
                 total += stage_total
                 stage_total = 0
+                latest_bet = 0  # reset latest bet in new stage
             elif action == "bMIN":
-                stage_total += max(2, int(total / 3))  # bet 1/3 pot
+                latest_bet = max(2, int(total / 3))  # bet 1/3 pot
+                stage_total += latest_bet
             elif action == "bMAX":
-                stage_total += total  # bet the pot
+                latest_bet = total  # bet the pot
+                stage_total += latest_bet
             elif action == "c":
-                if history[idx - 1] == "bMIN":
-                    stage_total += max(2, int(total / 3))
-                elif history[idx - 1] == "bMAX" and history[idx - 2] == "bMIN":
-                    stage_total = 2 * total
-                elif history[idx - 1] == "bMAX":
-                    stage_total += total
+                stage_total = 2 * latest_bet
 
         total += stage_total
-        return total
+        return total, latest_bet
 
     def __add__(self, action: Action):
         new_history = PostflopHoldemHistory(self.history + [action], self.sample_id)
