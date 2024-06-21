@@ -11,7 +11,7 @@ Card Abstraction (equity only)
 
 Total = 10^3 = 1000 clusters
 
-TODO: More refined card abstraction using equity distribution
+TODO: More refined card abstraction using equity distribution (though this probs make convergence take longer for infosets)
 Card Abstraction (equity distribution, to compute potential of hand)
 - 50 clusters for flop
 - 50 clusters for turn
@@ -263,7 +263,6 @@ class PostflopHoldemHistory(base.History):
                     continue
                 if stage_i != 0:
                     community_cards += [history[i][j : j + 2] for j in range(0, len(action), 2)]
-                    print(hand + community_cards)
                 if stage_i == 1:
                     assert len(action) == 6
                     infoset.append(str(predict_cluster(hand + community_cards)))
@@ -276,6 +275,7 @@ class PostflopHoldemHistory(base.History):
             else:
                 infoset.append(action)
 
+        print("my hand with community cards: ", hand + community_cards)
         return "".join(infoset)
 
     def get_infoSet_key(self) -> List[Action]:
