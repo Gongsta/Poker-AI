@@ -94,7 +94,7 @@ class PreflopHoldemHistory(base.History):
             - k ("check")
             - bMIN ("bet pot")
             - bMID ("bet 2x pot size")
-            - bMAX ("bet 4x pot size")
+            - bMAX ("all-in")
             - c ("call")
             - f ("fold")
 
@@ -201,9 +201,8 @@ class PreflopHoldemHistory(base.History):
                 stage_total = latest_bet + 2 * stage_total  # bet 2x pot
                 latest_bet = 2 * old_stage_total
             elif action == "bMAX":
-                old_stage_total = stage_total
-                stage_total = latest_bet + 4 * stage_total  # bet all in
-                latest_bet = 4 * old_stage_total
+                stage_total = latest_bet + 100  # bet all in
+                latest_bet = 100
             elif action == "c":
                 stage_total = 2 * latest_bet  # call
 
