@@ -3,7 +3,6 @@ tqdm # Progress Bars
 treys # to validate that our own implementation of hand evaluation works, but phevaluator is even faster
 joblib # parallel computation and store models
 phevaluator # fast poker hand evaluator using string representation of cards
-torch
 matplotlib
 scikit-learn
 py3-tts
