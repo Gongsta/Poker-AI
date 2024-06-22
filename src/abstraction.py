@@ -37,7 +37,7 @@ from fast_evaluator import phEvaluatorSetup
 import argparse
 from sklearn.cluster import KMeans
 
-USE_KMEANS = True  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
+USE_KMEANS = False  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
 NUM_FLOP_CLUSTERS = 10
 NUM_TURN_CLUSTERS = 10
 NUM_RIVER_CLUSTERS = 10

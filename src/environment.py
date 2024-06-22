@@ -12,7 +12,7 @@ class PokerEnvironment:
     Also see the HoldEmHistory class in holdem.py
     """
 
-    def __init__(self) -> None:
+    def __init__(self, input_cards=False) -> None:
         self.players: List[Player] = []
         self.deck = Deck()
 
@@ -41,10 +41,10 @@ class PokerEnvironment:
 
         # FIXED BALANCES
         self.new_player_balance = 2500
-        self.SMALL_BLIND = 10
-        self.BIG_BLIND = 20
+        self.SMALL_BLIND = 100
+        self.BIG_BLIND = 200
 
-        self.INPUT_CARDS = True
+        self.input_cards = input_cards
 
         self.history = []
         self.players_balance_history = []  # List of "n" list for "n" players
@@ -121,8 +121,10 @@ class PokerEnvironment:
     def start_new_round(self):
         assert len(self.players) >= 2  # We cannot start a poker round with less than 2 players...
 
-        if self.INPUT_CARDS:
+        if self.input_cards:
             self.new_player_balance = int(input("Enter the starting balance for the players: "))
+            self.BIG_BLIND = int(input("Enter the big blind: "))
+            self.SMALL_BLIND = int(self.BIG_BLIND / 2)
         # Reset Players
         for player in self.players:
             player.playing_current_round = True
@@ -234,7 +236,7 @@ class PokerEnvironment:
             player_idx = (self.dealer_button_position + 1 + i) % len(self.players)
             card_str = ""
             for i in range(2):
-                if self.INPUT_CARDS and player_idx == 0:
+                if self.input_cards and player_idx == 0:
                     card = Card(input(f"Enter the card that was dealt (ex: Ah): "))
                 else:
                     card = self.deck.draw()
@@ -248,7 +250,7 @@ class PokerEnvironment:
         self.deck.draw()  # We must first burn one card, TODO: Show on video
 
         for i in range(3):  # Draw 3 cards
-            if self.INPUT_CARDS:
+            if self.input_cards:
                 card = Card(input(f"Input the {i}-th community card (ex: 'Ah'): "))
             else:
                 card = self.deck.draw()
@@ -265,7 +267,7 @@ class PokerEnvironment:
     def play_turn(self):
 
         self.deck.draw()
-        if self.INPUT_CARDS:
+        if self.input_cards:
             card = Card(input("Input the turn card (ex: '5d'): "))
         else:
             card = self.deck.draw()
@@ -280,7 +282,7 @@ class PokerEnvironment:
 
     def play_river(self):
         self.deck.draw()
-        if self.INPUT_CARDS:
+        if self.input_cards:
             card = Card(input(f"Input the river card (ex: 'Ah'): "))
         else:
             card = self.deck.draw()
@@ -341,7 +343,7 @@ class PokerEnvironment:
             for idx, player in enumerate(self.players):
                 if player.playing_current_round:
                     indices_of_potential_winners.append(idx)
-                    if self.INPUT_CARDS and idx == 1:
+                    if self.input_cards and idx == 1:
                         # Add opponents hand to calculate showdown winner
                         self.players[1].clear_hand()
                         self.players[1].add_card_to_hand(
