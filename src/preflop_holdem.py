@@ -110,7 +110,7 @@ class PreflopHoldemHistory(base.History):
             )  # game_stage_ended would mean that it is a chance node
 
             if len(self.history) == 2:
-                return ["c", "bMIN", "bMID", "bMAX"]
+                return ["c", "bMIN", "bMID", "bMAX", "f"]
             elif self.history[-1] == "bMIN":
                 return ["bMID", "bMAX", "f", "c"]
             elif self.history[-1] == "bMID":

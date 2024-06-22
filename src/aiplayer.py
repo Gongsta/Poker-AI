@@ -251,7 +251,9 @@ class CFRAIPlayer(AIPlayer):
         # stage_pot_balance used for preflop, total_pot_balance used for postflop
 
         action = None
-        HEURISTICS = True  # trying this in case my preflop strategy sucks
+        HEURISTICS = True  # My preflop strategy sucks, using heuristics based approach
+
+        SMALLEST_BET = int(BIG_BLIND / 2)
         if len(community_cards) == 0:  # preflop
             if HEURISTICS:
                 player = EquityAIPlayer(self.player_balance)
@@ -289,14 +291,15 @@ class CFRAIPlayer(AIPlayer):
             abstracted_action = getAction(strategy)
             print("Abstracted action: ", action)
             if abstracted_action == "bMIN":
-                action = "b" + str(max(BIG_BLIND, int(1 / 3 * total_pot_balance)))
+                action = "b" + str(
+                    max(BIG_BLIND, int(1 / 3 * total_pot_balance / SMALLEST_BET) * SMALLEST_BET)
+                )
             elif abstracted_action == "bMAX":
                 action = "b" + str(min(total_pot_balance, player_balance))
             else:
                 action = abstracted_action
 
-        print("history: ", history)
-        if not HEURISTICS:
+            print("history: ", history)
             print("Abstracted history: ", abstracted_history)
             print("Infoset key: ", infoset_key)
             print("AI strategy ", strategy)
