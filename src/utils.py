@@ -3,6 +3,20 @@ Some old util code that might be useful in the future
 """
 
 import torch  # To run K-means with GPU
+import numpy as np
+import glob
+import os
+
+
+def get_filenames(folder, extension=".npy"):
+    filenames = []
+
+    for path in glob.glob(os.path.join(folder, "*" + extension)):
+        # Extract the filename
+        filename = os.path.split(path)[-1]
+        filenames.append(filename)
+
+    return filenames
 
 
 # Modified version of K-Means to add Earth Mover's Distance from here: https://github.com/subhadarship/kmeans_pytorch/blob/master/kmeans_pytorch/__init__.py

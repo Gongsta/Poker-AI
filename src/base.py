@@ -191,7 +191,9 @@ class CFR:
         # Return payoff for terminal states
         if history.is_terminal():
             if debug:
-                print(f"history: {history.history} utility: {history.terminal_utility(i)}, player: {i}")
+                print(
+                    f"history: {history.history} utility: {history.terminal_utility(i)}, player: {i}"
+                )
                 time.sleep(0.1)
             return history.terminal_utility(i)
         elif history.is_chance():
@@ -394,13 +396,10 @@ class CFR:
             if (t + 1) % self.tracker_interval == 0:
                 print("Average game value player 0: ", util_0 / t)
                 print("Average game value player 1: ", util_1 / t)
-                self.tracker(self.infoSets)
-                self.tracker.pprint()
+                if len(self.infoSets) < 100000:
+                    self.tracker(self.infoSets)
+                    self.tracker.pprint()
 
-            if t % 500000 == 0:
-                self.export_infoSets(f"infoSets_{t}.joblib")
-
-        self.export_infoSets("infoSets_solved.joblib")
         if method == "manim":
             return histories
 

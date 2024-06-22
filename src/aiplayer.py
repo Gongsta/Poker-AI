@@ -84,7 +84,7 @@ class AIPlayer(Player):
     def process_action(self, action, observed_env):
         if action == "k":  # check
             if observed_env.game_stage == 2:
-                self.current_bet = 2
+                self.current_bet = observed_env.BIG_BLIND
             else:
                 self.current_bet = 0
 
@@ -251,7 +251,7 @@ class CFRAIPlayer(AIPlayer):
         # stage_pot_balance used for preflop, total_pot_balance used for postflop
 
         action = None
-        HEURISTICS = True  # My preflop strategy sucks, using heuristics based approach
+        HEURISTICS = False  # Use in case my preflop strategy sucks
 
         SMALLEST_BET = int(BIG_BLIND / 2)
         if len(community_cards) == 0:  # preflop
@@ -276,12 +276,16 @@ class CFRAIPlayer(AIPlayer):
                     action = "b" + str(max(BIG_BLIND, int(stage_pot_balance)))
                 elif abstracted_action == "bMID":
                     action = "b" + str(max(BIG_BLIND, 2 * int(stage_pot_balance)))
-                elif (
-                    abstracted_action == "bMAX"
-                ):  # in training, i have it set to all in... but wiser to 4x pot?
-                    action = "b" + str(min(player_balance, 4 * int(stage_pot_balance)))
+                elif abstracted_action == "bMAX":  # all-in... oh god
+                    action = "b" + str(player_balance)
                 else:
                     action = abstracted_action
+
+                print("history: ", history)
+                print("Abstracted history: ", abstracted_history)
+                print("Infoset key: ", infoset_key)
+                print("AI strategy ", strategy)
+                print("Abstracted Action:", abstracted_action, "Final Action:", action)
         else:
             abstracted_history = self.perform_postflop_abstraction(
                 history, BIG_BLIND=BIG_BLIND
@@ -319,7 +323,7 @@ class CFRAIPlayer(AIPlayer):
                 abstracted_history += ["bMIN", "bMAX"]
         else:
             bet_size = BIG_BLIND
-            pot_total = 3
+            pot_total = BIG_BLIND + int(BIG_BLIND / 2)
             for i, action in enumerate(stage[2:]):
                 if action[0] == "b":
                     bet_size = int(action[1:])

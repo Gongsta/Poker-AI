@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 import os
-import glob
+from utils import get_filenames
 import joblib
 from joblib import Parallel, delayed
 from tqdm import tqdm
@@ -37,17 +37,51 @@ from fast_evaluator import phEvaluatorSetup
 import argparse
 from sklearn.cluster import KMeans
 
-USE_KMEANS = False  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
+USE_KMEANS = True  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
 NUM_FLOP_CLUSTERS = 10
 NUM_TURN_CLUSTERS = 10
 NUM_RIVER_CLUSTERS = 10
+
+NUM_BINS = 10
+
+
+def load_kmeans_classifiers():
+    global kmeans_flop, kmeans_turn
+    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/flop"))
+    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
+    print("Loading KMeans Flop Classifier", filename)
+
+    centroids = joblib.load(f"../data/clusters/flop/{filename}")
+    kmeans_flop = KMeans(NUM_FLOP_CLUSTERS)
+    kmeans_flop.cluster_centers_ = centroids
+    kmeans_flop._n_threads = -1
+
+    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/turn"))
+    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
+    print("Loading KMeans Turn Classifier", filename)
+
+    centroids = joblib.load(f"../data/clusters/turn/{filename}")
+    kmeans_turn = KMeans(NUM_TURN_CLUSTERS)
+    kmeans_turn.cluster_centers_ = centroids
+    kmeans_turn._n_threads = -1
+
+    assert len(kmeans_flop.cluster_centers_) == NUM_FLOP_CLUSTERS
+    assert len(kmeans_turn.cluster_centers_) == NUM_TURN_CLUSTERS
+
+    return kmeans_flop, kmeans_turn
+
 
 if USE_KMEANS:
     # See `notebook/abstraction_exploration.ipynb` for some exploration of how many clusters to use
     NUM_FLOP_CLUSTERS = 50
     NUM_TURN_CLUSTERS = 50
-    NUM_RIVER_CLUSTERS = 10  # For river, you can just compute equity
-    load_kmeans_classifiers()
+    # For river, you can just compute equity, no need for equity distribution
+    NUM_RIVER_CLUSTERS = 10
+    try:
+        load_kmeans_classifiers()
+    except:
+        print("Couldn't load KMeans Classifiers. Generating new ones.")
+        clustering = True
 
 
 def evaluate_winner(board, player_hand, opponent_hand):
@@ -235,7 +269,16 @@ def get_preflop_cluster_id(two_cards_string):  # Lossless abstraction for pre-fl
         assert len(a) == 1 and len(b) == 1
         first = min(KEY[a], KEY[b])
         second = max(KEY[a], KEY[b])
-        ans = first * (first - 1) / 2 + (second - 1)
+
+        def sum(b):
+            if b <= 1:
+                return 0
+            n = b - 1
+            a = 12
+            l = 12 - (b - 2)
+            return (n * (a + l)) // 2
+
+        ans = sum(first) + (second - first)
         return int(ans)
 
     if two_cards_string[0] == two_cards_string[2]:  # pockets
@@ -278,7 +321,7 @@ def calculate_equity(player_cards: List[str], community_cards=[], n=2000, timer=
 
 
 def calculate_equity_distribution(
-    player_cards: List[str], community_cards=[], bins=5, n=200, timer=False, parallel=False
+    player_cards: List[str], community_cards=[], bins=NUM_BINS, n=200, timer=False, parallel=False
 ):
     """
     Return
@@ -378,35 +421,37 @@ def generate_postflop_equity_distributions(
 ):  # Lossful abstraction for flop, turn and river
     if timer:
         start_time = time.time()
-    assert stage is None or stage == "flop" or stage == "turn" or stage == "river"
+    assert stage is None or stage == "flop" or stage == "turn"
     equity_distributions = []
     hands = []
 
     if stage is None:
         generate_postflop_equity_distributions(n_samples, bins, "flop", save, timer)
         generate_postflop_equity_distributions(n_samples, bins, "turn", save, timer)
-        generate_postflop_equity_distributions(n_samples, bins, "river", save, timer)
+        return
     elif stage == "flop":
         num_community_cards = 3
     elif stage == "turn":
         num_community_cards = 4
-    elif stage == "river":
-        num_community_cards = 5
 
-    deck = fast_evaluator.Deck()
-    for i in tqdm(range(n_samples)):
+    def process_sample(num_community_cards, bins):
+        deck = fast_evaluator.Deck()
         random.shuffle(deck)
-
         player_cards = deck[:2]
         community_cards = deck[2 : 2 + num_community_cards]
         distribution = calculate_equity_distribution(player_cards, community_cards, bins)
-        equity_distributions.append(distribution)
-        hands.append(" ".join(player_cards + community_cards))
+        hand = " ".join(player_cards + community_cards)
+        return distribution, hand
+
+    results = Parallel(n_jobs=-1)(
+        delayed(process_sample)(num_community_cards, bins) for _ in tqdm(range(n_samples))
+    )
+    equity_distributions = [result[0] for result in results]
+    hands = [result[1] for result in results]
 
     assert len(equity_distributions) == len(hands)
 
     equity_distributions = np.array(equity_distributions)
-    print(equity_distributions)
     if save:
         create_abstraction_folders()
         file_id = int(time.time())  # Use the time as the file_id
@@ -418,29 +463,10 @@ def generate_postflop_equity_distributions(
         )  # Store the list of hands, so you can associate a particular distribution with a particular hand
 
 
-def get_filenames(folder, extension=".npy"):
-    filenames = []
-
-    for path in glob.glob(os.path.join(folder, "*" + extension)):
-        # Extract the filename
-        filename = os.path.split(path)[-1]
-        filenames.append(filename)
-
-    return filenames
-
-
 def predict_cluster_kmeans(kmeans_classifier, cards, n=200):
     """cards is a list of cards"""
     assert type(cards) == list
     equity_distribution = calculate_equity_distribution(cards[:2], cards[2:], n=n)
-    print(
-        "averaged historgram: ",
-        0.1 * equity_distribution[0]
-        + 0.3 * equity_distribution[1]
-        + 0.5 * equity_distribution[2]
-        + 0.7 * equity_distribution[3]
-        + 0.9 * equity_distribution[4],
-    )
     y = kmeans_classifier.predict([equity_distribution])
     assert len(y) == 1
     return y[0]
@@ -476,37 +502,6 @@ def predict_cluster_fast(cards, n=2000, total_clusters=10):
     return cluster
 
 
-def load_kmeans_classifiers():
-    global kmeans_flop, kmeans_turn, kmeans_river
-    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/flop"))
-    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
-
-    centroids = joblib.load(f"../data/clusters/flop/{filename}")
-    kmeans_flop = KMeans(NUM_FLOP_CLUSTERS)
-    kmeans_flop.cluster_centers_ = centroids
-    kmeans_flop._n_threads = -1
-
-    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/turn"))
-    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
-    centroids = joblib.load(f"../data/clusters/turn/{filename}")
-    kmeans_turn = KMeans(NUM_TURN_CLUSTERS)
-    kmeans_turn.cluster_centers_ = centroids
-    kmeans_turn._n_threads = -1
-
-    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/river"))
-    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
-    centroids = joblib.load(f"../data/clusters/river/{filename}")
-    kmeans_river = KMeans(NUM_RIVER_CLUSTERS)
-    kmeans_river.cluster_centers_ = centroids
-    kmeans_river._n_threads = -1
-
-    assert(len(kmeans_flop.cluster_centers_) == NUM_FLOP_CLUSTERS)
-    assert(len(kmeans_turn.cluster_centers_) == NUM_TURN_CLUSTERS)
-    assert(len(kmeans_river.cluster_centers_) == NUM_RIVER_CLUSTERS)
-
-    return kmeans_flop, kmeans_turn, kmeans_river
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Poker Hand Abstractions.")
     parser.add_argument(
@@ -514,7 +509,7 @@ if __name__ == "__main__":
         "--generate",
         action="store_true",
         dest="generate",
-        default=False,
+        default=True,
         help="Generate Abstractions.",
     )
     parser.add_argument(
@@ -524,15 +519,22 @@ if __name__ == "__main__":
         help="Number of samples to sample from to generate the abstraction.",
     )
     parser.add_argument(
-        "--n_clusters", default=50, dest="n_clusters", help="Number of clusters to generate."
+        "--n_clusters",
+        default=NUM_FLOP_CLUSTERS,
+        dest="n_clusters",
+        help="Number of clusters to generate.",
     )
     parser.add_argument(
-        "-b", "--bins", default=5, dest="bins", help="The granularity of your generated data."
+        "-b",
+        "--bins",
+        default=NUM_BINS,
+        dest="bins",
+        help="The granularity of your generated data.",
     )
     parser.add_argument(
         "-s",
         "--stage",
-        default="turn",
+        default="flop",
         dest="stage",
         help="Select the stage of the game that you would like to abstract (flop, turn, river).",
     )
@@ -546,60 +548,26 @@ if __name__ == "__main__":
     n_samples = int(args.n_samples)
     bins = args.bins
 
-    # TODO: River doesn't really need equity distribution... just calculate equity
     if generate:
-        generate_postflop_equity_distributions(n_samples, bins, stage)
+        generate_postflop_equity_distributions(n_samples, bins, None)  #
 
     if clustering:
-        raw_dataset_filenames = sorted(get_filenames(f"../data/raw/{stage}"))
-        filename = raw_dataset_filenames[
-            -1
-        ]  # Take the most recently generated dataset to run our clustering on
-
-        equity_distributions = np.load(f"../data/raw/{stage}/{filename}")  # TODO: Switch to joblib
-        print(filename)
-        if not os.path.exists(f"../data/clusters/{stage}/{filename}"):
-            print(f"Generating the cluster for the {stage}")
+        stages = ["flop", "turn"]
+        for stage in stages:
+            raw_dataset_filenames = sorted(get_filenames(f"../data/raw/{stage}"))
+            # Take the most recently generated dataset to run our clustering on
+            filename = raw_dataset_filenames[-1]
             print(filename)
-            if stage == "flop":
-                kmeans = KMeans(NUM_FLOP_CLUSTERS)
-            elif stage == "turn":
-                kmeans = KMeans(NUM_TURN_CLUSTERS)
-            elif stage == "river":
-                kmeans = KMeans(NUM_RIVER_CLUSTERS)
-            else:
-                raise ValueError("Invalid stage: ", stage)
 
-            kmeans.fit(equity_distributions)  # Perform Clustering
-            centroids = kmeans.cluster_centers_
-            joblib.dump(centroids, f"../data/clusters/{stage}/{filename}")
-        else:  # Centroids have already been generated, just load them, which are tensors
-            centroids = joblib.load(f"../data/clusters/{stage}/{filename}")
-            # Load KMeans Model
-            if stage == "flop":
-                kmeans = KMeans(NUM_FLOP_CLUSTERS)
-            elif stage == "turn":
-                kmeans = KMeans(NUM_TURN_CLUSTERS)
-            elif stage == "river":
-                kmeans = KMeans(NUM_RIVER_CLUSTERS)
-            else:
-                raise ValueError("Invalid stage: ", stage)
+            equity_distributions = np.load(f"../data/raw/{stage}/{filename}")
+            if not os.path.exists(f"../data/clusters/{stage}/{filename}"):
+                if stage == "flop":
+                    kmeans = KMeans(NUM_FLOP_CLUSTERS)
+                elif stage == "turn":
+                    kmeans = KMeans(NUM_TURN_CLUSTERS)
 
-            kmeans.cluster_centers_ = centroids
-            kmeans._n_threads = -1
-
-        centroids = joblib.load(f"../data/clusters/{stage}/{filename}")
-        # Load KMeans Model
-
-    predict = False
-
-    # # Visualization of the hands
-    # hands = joblib.load(f'data/raw/{stage}/{filename.split(".")[0]}')
-    # for i in range(equity_distributions.shape[0]):
-    # 	hand = hands[i]
-    # 	hand = hand.split(' ')
-    # 	player_cards = hand[0]
-    # 	community_cards = hand[0]
-    # 	plot_equity_hist(equity_distributions[i], player_cards, community_cards)
-
-    # Visualize the clusstering
+                kmeans.fit(equity_distributions)  # Perform Clustering
+                centroids = kmeans.cluster_centers_
+                joblib.dump(centroids, f"../data/clusters/{stage}/{filename}")
+    else:  # Centroids have already been generated, just load them, which are tensors
+        load_kmeans_classifiers()
