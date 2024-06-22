@@ -17,6 +17,7 @@ class AIPlayer(Player):
     def __init__(self, balance) -> None:
         super().__init__(balance)
         self.is_AI = True
+        self.speak = True
 
         self.engine = pyttsx3.init()
 
@@ -33,7 +34,7 @@ class AIPlayer(Player):
                 "I call your bet. Bring it on!",
             ],
             "f": [
-                "I Fold. You win this one.",
+                "I Fold. You win this one, but not for long.",
                 "Fold. Consider yourself lucky.",
                 "I'm folding. Don't get used to it.",
             ],
@@ -67,15 +68,18 @@ class AIPlayer(Player):
 
     def trash_talk_win(self):
         self.engine.say(random.choice(self.get_trash_talk("win")))
-        self.engine.runAndWait()
+        if self.speak:
+            self.engine.runAndWait()
 
     def trash_talk_lose(self):
         self.engine.say(random.choice(self.get_trash_talk("lose")))
-        self.engine.runAndWait()
+        if self.speak:
+            self.engine.runAndWait()
 
     def trash_talk_fold(self):
         self.engine.say(random.choice(self.get_trash_talk("opponent_fold")))
-        self.engine.runAndWait()
+        if self.speak:
+            self.engine.runAndWait()
 
     def process_action(self, action, observed_env):
         if action == "k":  # check
@@ -84,7 +88,7 @@ class AIPlayer(Player):
             else:
                 self.current_bet = 0
 
-            self.engine.say("I Check")
+            self.engine.say(random.choice(self.get_trash_talk("k")))
         elif action == "c":
             if observed_env.get_highest_current_bet() == self.player_balance:
                 self.engine.say("I call your all-in. You think I'm afraid?")
@@ -101,7 +105,8 @@ class AIPlayer(Player):
             else:
                 self.engine.say(random.choice(self.get_trash_talk("b", self.current_bet)))
 
-        self.engine.runAndWait()
+        if self.speak:
+            self.engine.runAndWait()
 
     def place_bet(self, observed_env):
         raise NotImplementedError
@@ -245,7 +250,8 @@ class CFRAIPlayer(AIPlayer):
         # Bet sizing uses the pot balance
         # stage_pot_balance used for preflop, total_pot_balance used for postflop
 
-        HEURISTICS = False # trying this in case my preflop strategy sucks
+        action = None
+        HEURISTICS = True  # trying this in case my preflop strategy sucks
         if len(community_cards) == 0:  # preflop
             if HEURISTICS:
                 player = EquityAIPlayer(self.player_balance)
@@ -263,36 +269,38 @@ class CFRAIPlayer(AIPlayer):
                 abstracted_history = self.perform_preflop_abstraction(history, BIG_BLIND=BIG_BLIND)
                 infoset_key = "".join(PreflopHoldemHistory(abstracted_history).get_infoSet_key())
                 strategy = self.preflop_infosets[infoset_key].get_average_strategy()
-                action = getAction(strategy)
-                print("Abstracted action: ", action)
-                if action == "bMIN":
+                abstracted_action = getAction(strategy)
+                if abstracted_action == "bMIN":
                     action = "b" + str(max(BIG_BLIND, int(stage_pot_balance)))
-                elif action == "bMID":
+                elif abstracted_action == "bMID":
                     action = "b" + str(max(BIG_BLIND, 2 * int(stage_pot_balance)))
                 elif (
-                    action == "bMAX"
+                    abstracted_action == "bMAX"
                 ):  # in training, i have it set to all in... but wiser to 4x pot?
                     action = "b" + str(min(player_balance, 4 * int(stage_pot_balance)))
+                else:
+                    action = abstracted_action
         else:
-            print("history: ", history)
             abstracted_history = self.perform_postflop_abstraction(
                 history, BIG_BLIND=BIG_BLIND
             )  # condense down bet sequencing
             infoset_key = PostflopHoldemHistory(abstracted_history).get_infoSet_key_online()
             strategy = self.postflop_infosets[infoset_key].get_average_strategy()
-            action = getAction(strategy)
+            abstracted_action = getAction(strategy)
             print("Abstracted action: ", action)
-            if action == "bMIN":
+            if abstracted_action == "bMIN":
                 action = "b" + str(max(BIG_BLIND, int(1 / 3 * total_pot_balance)))
-            elif action == "bMAX":
+            elif abstracted_action == "bMAX":
                 action = "b" + str(min(total_pot_balance, player_balance))
+            else:
+                action = abstracted_action
 
+        print("history: ", history)
         if not HEURISTICS:
             print("Abstracted history: ", abstracted_history)
             print("Infoset key: ", infoset_key)
             print("AI strategy ", strategy)
-
-        print("Action selected", action)
+            print("Abstracted Action:", abstracted_action, "Final Action:", action)
 
         return action
 

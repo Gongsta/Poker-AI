@@ -40,11 +40,11 @@ class PokerEnvironment:
         self.showdown = False  # flag that can be used to reveal opponents cards if needed
 
         # FIXED BALANCES
-        self.new_player_balance = 100
-        self.SMALL_BLIND = 1
-        self.BIG_BLIND = 2
+        self.new_player_balance = 2500
+        self.SMALL_BLIND = 10
+        self.BIG_BLIND = 20
 
-        self.INPUT_CARDS = False
+        self.INPUT_CARDS = True
 
         self.history = []
         self.players_balance_history = []  # List of "n" list for "n" players
@@ -242,7 +242,7 @@ class PokerEnvironment:
                 card_str += str(card)
                 self.players[player_idx].add_card_to_hand(card)
 
-            self.history += [card_str] # always deal to the non-dealer first
+            self.history += [card_str]  # always deal to the non-dealer first
 
     def play_flop(self):
         self.deck.draw()  # We must first burn one card, TODO: Show on video
@@ -331,6 +331,9 @@ class PokerEnvironment:
         return self.game_stage == 6
 
     def end_round(self):
+        self.update_player_balances_at_end_of_stage()
+        self.move_stage_to_total_pot_balance()
+
         if self.count_remaining_players_in_round() > 1:
             self.showdown = True
             evaluator = Evaluator()

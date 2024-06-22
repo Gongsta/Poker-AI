@@ -94,11 +94,6 @@ elif STRATEGY == 4:
     USERNAME = "cfr_abstraction"
     PASSWORD = "cfr_abstraction"
     player = CFRAIPlayer(20000)
-# if os.path.exists(f"../data/slumbot/{USERNAME}.joblib"):  # Load previous history if it exists
-#     history = joblib.load(f"../data/slumbot/{USERNAME}.joblib")
-
-if not os.path.exists("../data/slumbot"):
-    os.makedirs("../data/slumbot")
 
 NUM_STREETS = 4
 SMALL_BLIND = 50
@@ -318,10 +313,6 @@ def Act(token, action):
         print("Could not get JSON from response")
         sys.exit(-1)
 
-    if "error_msg" in r:
-        print("Error: %s" % r["error_msg"])
-        sys.exit(-1)
-
     return r
 
 
@@ -474,6 +465,9 @@ def PlayHand(token, debug=False):
         if debug:
             print("Sending incremental action: %s" % incr)
         r = Act(token, incr)
+        if "error_msg" in r:
+            print("Error: %s" % r["error_msg"])
+            return (token, 0, 0)
     # Should never get here
 
 

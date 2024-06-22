@@ -177,12 +177,15 @@ def display_opponent_bet(env: PokerEnvironment):
 
 
 def display_sessions_winnings(env: PokerEnvironment):
-    # winnings = sum(env.players_balance_history[0])
     winnings = 0
+    if len(env.players_balance_history) != 0:
+        winnings = sum(env.players_balance_history[0])
     if winnings < 0:
         text = POT_FONT.render("Session Winnings: -$" + str(-winnings), 1, WHITE)
     else:
         text = POT_FONT.render("Session Winnings: $" + str(winnings), 1, WHITE)
+
+    WIN.blit(text, scale_tuple((WIDTH - 400, 40), scale_factor))
 
 
 def display_turn(env: PokerEnvironment):
@@ -190,7 +193,7 @@ def display_turn(env: PokerEnvironment):
         text = POT_FONT.render("YOUR TURN", 1, WHITE)
     else:
         text = POT_FONT.render("OPPONENT TURN", 1, RED)
-    WIN.blit(text, (70, 40))
+    WIN.blit(text, scale_tuple((70, 40), scale_factor))
 
 
 def display_user_cards(env: PokerEnvironment):
@@ -387,8 +390,6 @@ def main():
     #     env.add_player()  # Player since we want everything to be entered manually
     # else:
     #     env.add_AI_player()  # Opponent
-    # play as the AI
-    # env.add_AI_player()
     # env.add_player()
     env.add_AI_player()
     env.add_player()
@@ -414,8 +415,7 @@ def main():
         global input_bet_text, active, cursor_counter, warning_text
         cursor_counter = (cursor_counter + 1) % 30
 
-        if user_input or replay:  # If you want to render PyGame
-            clock.tick(FPS)
+        clock.tick(FPS)
 
         if env.players[env.position_in_play].is_AI:
             env.handle_game_stage()
