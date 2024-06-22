@@ -51,16 +51,33 @@ Poker is an interesting game to work on because it is an imperfect information g
 - [ ] Implement depth-limited solving to improve the strategy in real-time
 - [ ] Implement Computer Vision + Deep Learning to recognize Poker cards, and so you can deploy this model in real life by mounting a camera to your head
 
+## Important Files
+- `poker_main.py` contains code for the GUI interface to the Poker game
+- `environment.py` contains the game logic
+- `aiplayer.py` contains logic to interface with AI
+- `abstraction.py` contains logic for clustering cards based on equity
+- `postflop_holdem.py` contains the logic for training Poker AI for **postflop**
+- `preflop_hodlem.py` contains logic for trainining Poker AI for **preflop**
 
 ### Timeline
 06-06-2022: Created a basic Poker Environment in PyGame to play in. Wrote classes for `Card`, `Deck`, `Player`, `PokerEnvironment`. Used bitmasks to quickly evaluate the strength of a hand.
+
 07-01-2022: Started learning about writing the AI. Explored different reinforcement learning algorithms, look into what papers have done. Realized that RL algorithms don't work at all in imperfect information games. It fails at the simplest game of Rock-Paper-Scissors because the policy it comes up with is deterministic, and easily exploitable. What we need to do is take a game theory approach, using the idea of Counterfactual Regret Minimization (CFR) to create a strategy that converges to the Nash Equilibrium.
+
 07-05-2022: Implementd regret-matching for Rock-Paper-Scissors
+
 07-15-2022: Wrote the vanilla CFR code for Kuhn Poker
+
 09-07-2022: Implemented abstractions to reduce the size of the Poker game to solve for. Implemented a simple clustering algorithm that uses these EHS to cluster various cards / scenarios together. Implemented basic monte-carlo method to calculate the EHS of a pair of cards at different stages of the game. This assumes a random uniform draw of opponent hands and random uniform rollout of community cards.
+
 09-20-2022: Used this project as a personal poker trainer (displaying the pot odds). Can help you refine your game, see the `learn_pot_odds.py` file.
-09-30: Write CFR code as a library, since there is no universal support of CFR. I wish the researchers released those, but everyone seems to just do their own thing. It kind of seems like the early days of neural networks, when everyone would write their own backward pass for backpropagation, until Tensorflow and Pytorch came along.
-06-15-2024: Started revisiting the project. Used simple equity to cluster, since computing equity distribution is too slow, my compute not beefy enough.
+
+09-30-2022: Write CFR code as a library, since there is no universal support of CFR. I wish the researchers released those, but everyone seems to just do their own thing. It kind of seems like the early days of neural networks, when everyone would write their own backward pass for backpropagation, until Tensorflow and Pytorch came along.
+
+06-15-2024: Started revisiting the project. Tried to train on the full poker game tree, but noticed that there were too many states to train on.
+
+06-18-2024: Used simple equity to cluster.
+
 06-17-2024: Split into preflop training and post-flop training. Started training over 1,000,000 different hands, with dataset generated in `src/dataset`.
 
 ### Dataset
@@ -70,8 +87,14 @@ I generated 1,000,000 hands of poker data offline, which I used to train the AI.
 Poker has very high variance, which also makes it hard to benchmark. I've benchmarked against the [Slumbot](https://www.slumbot.com/), which was one of the best poker bots in the world in 2017. Measured across ~10,000 hands. API code in [slumbot_api.py](slumbot/slumbot_api.py). Visualizations generated from the [visualize.ipynb](slumbot/visualize.ipynb) notebook.
 
 First 3 strategies implement logic purely on heuristics.
+### Strategy 0: All-in (-295.895 BB/100)
 
-#### Strategy 0: Always checking or calling the opponent's bet (-142.325 BB/100)
+```python
+incr = "b20000"
+```
+
+![Strategy 0](results/strategy0.png)
+### Strategy 1: Always checking or calling the opponent's bet (-123.335 BB/100)
 This is the most naive implementation, where we always check or call the opponent's bet. We never fold.
 
 
@@ -82,11 +105,11 @@ else:  # opponent has bet, so simply call
     incr = "c"
 ```
 
-![Strategy 0](results/strategy0.png)
+
+![Strategy 1](results/strategy1.png)
 
 
-
-#### Strategy 1: Naive bet by equity (-77.36 BB/100)
+### Strategy 2: Naive bet by equity (-112.045 BB/100)
 ```python
 equity = calculate_equity(hole_cards, board, n=5000)
 print(f"equity calculated: {equity} for hole cards: {hole_cards} and board: {board}")
@@ -102,24 +125,25 @@ else:
         incr = "f"
 ```
 
-![Strategy 1](results/strategy1.png)
+![Strategy 2](results/strategy2.png)
 
-#### Strategy 2: More advanced equity
+### Strategy 3: More advanced equity (-204.2917 BB/100)
 A more advanced heuristics that makes bets based on the current equity (see `slumbot/slumbot_api.py`).
 
 I actually played this "AI" against my dad and it had beaten him :P
 
-#### Strategy 3: use CFR
-CFR on very abstracted version of the game. Preflop and flop solved independently.
+![Strategy 3](results/strategy3.png)
+
+### Strategy 4: CFR (WORK-IN-PROGRESS)
+CFR on very abstracted version of the game. Preflop and flop solved independently through `preflop_holdem.py` and `postflop_holdem.py`. Abstractions
+computed in `src/abstraction.py`.
+
+Still need to implement kmeans clustering for post-flop, turn, and river.
 
 
+![Strategy 4](results/strategy4.png)
 
-## Important Files
-- `poker_main.py` contains code for the GUI interface to the Poker game
-- `environment.py` contains the game logic
-- `aiplayer.py` contains logic to interface with AI
-- `postflop_holdem.py` contains the logic for training Poker AI for **postflop**
-- `preflop_hodlem.py` contains logic for trainining Poker AI for **preflop**
+
 
 
 ## High-Level overview of AI
