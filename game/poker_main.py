@@ -177,6 +177,9 @@ def display_opponent_bet(env: PokerEnvironment):
 
 
 def display_sessions_winnings(env: PokerEnvironment):
+    if env.players[0].is_AI: # don't show if AI
+        return
+
     winnings = 0
     if len(env.players_balance_history) != 0:
         winnings = sum(env.players_balance_history[0])
@@ -197,11 +200,12 @@ def display_turn(env: PokerEnvironment):
 
 
 def display_user_cards(env: PokerEnvironment):
+    WIN.blit(CARD_BACK, PLAYER_CARD_1)
+    WIN.blit(CARD_BACK, PLAYER_CARD_2)
+
+def reveal_user_cards(env: PokerEnvironment):
     WIN.blit(load_card_image(env.players[0].hand[0]), PLAYER_CARD_1)
     WIN.blit(load_card_image(env.players[0].hand[1]), PLAYER_CARD_2)
-    # WIN.blit(CARD_BACK, PLAYER_CARD_1)
-    # WIN.blit(CARD_BACK, PLAYER_CARD_2)
-
 
 def display_opponent_cards(env: PokerEnvironment):
     WIN.blit(CARD_BACK, OPPONENT_CARD_1)
@@ -242,10 +246,11 @@ def draw_window(env: PokerEnvironment, god_mode=False, user_input=False):
         god_mode = True
 
     # Display the cards
-    display_user_cards(env)
     if god_mode:
+        reveal_user_cards(env)
         reveal_opponent_cards(env)
     else:
+        display_user_cards(env)
         display_opponent_cards(env)
 
     # Display Community Cards
@@ -380,20 +385,11 @@ def main():
         game = 0
         game_i = 0
 
-    env: PokerEnvironment = PokerEnvironment()
-    # if user_input or replay:
-    #     env.add_player()  # You / replay
-    # else:
-    #     env.add_AI_player()  # Simulation player
+    INPUT_CARDS = False # Set to true if you want to input your own cards
+    env: PokerEnvironment = PokerEnvironment(input_cards=INPUT_CARDS)
 
-    # if replay:
-    #     env.add_player()  # Player since we want everything to be entered manually
-    # else:
-    #     env.add_AI_player()  # Opponent
-    # env.add_player()
-    env.add_AI_player()
-    env.add_player()
-    # env.add_player()  # play as the opponent too
+    env.add_player() # You
+    env.add_AI_player() # Oponent
     env.start_new_round()
 
     clock = pygame.time.Clock()
