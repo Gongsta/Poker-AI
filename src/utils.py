@@ -3,7 +3,7 @@ import glob
 import os
 
 
-def get_filenames(folder, extension=".npy"):
+def get_filenames(folder, extension=""):
     filenames = []
 
     for path in glob.glob(os.path.join(folder, "*" + extension)):

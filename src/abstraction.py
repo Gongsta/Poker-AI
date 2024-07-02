@@ -37,7 +37,7 @@ from fast_evaluator import phEvaluatorSetup
 import argparse
 from sklearn.cluster import KMeans
 
-USE_KMEANS = False  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
+USE_KMEANS = True  # use kmeans if you want to cluster by equity distribution (more refined, but less accurate)
 NUM_FLOP_CLUSTERS = 10
 NUM_TURN_CLUSTERS = 10
 NUM_RIVER_CLUSTERS = 10
@@ -47,23 +47,14 @@ NUM_BINS = 10
 
 def load_kmeans_classifiers():
     global kmeans_flop, kmeans_turn
-    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/flop"))
-    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
+
+    filename = sorted(get_filenames(f"../kmeans_data/kmeans/flop"))[-1]
     print("Loading KMeans Flop Classifier", filename)
+    kmeans_flop = joblib.load(f"../kmeans_data/kmeans/flop/{filename}")
 
-    centroids = joblib.load(f"../data/clusters/flop/{filename}")
-    kmeans_flop = KMeans(NUM_FLOP_CLUSTERS)
-    kmeans_flop.cluster_centers_ = centroids
-    kmeans_flop._n_threads = -1
-
-    raw_dataset_filenames = sorted(get_filenames(f"../data/clusters/turn"))
-    filename = raw_dataset_filenames[-1]  # Take the most recently generated dataset
+    filename = sorted(get_filenames(f"../kmeans_data/kmeans/turn"))[-1]
     print("Loading KMeans Turn Classifier", filename)
-
-    centroids = joblib.load(f"../data/clusters/turn/{filename}")
-    kmeans_turn = KMeans(NUM_TURN_CLUSTERS)
-    kmeans_turn.cluster_centers_ = centroids
-    kmeans_turn._n_threads = -1
+    kmeans_turn = joblib.load(f"../kmeans_data/kmeans/turn/{filename}")
 
     assert len(kmeans_flop.cluster_centers_) == NUM_FLOP_CLUSTERS
     assert len(kmeans_turn.cluster_centers_) == NUM_TURN_CLUSTERS
@@ -79,8 +70,8 @@ if USE_KMEANS:
     NUM_RIVER_CLUSTERS = 10
     try:
         load_kmeans_classifiers()
-    except:
-        print("Couldn't load KMeans Classifiers. Generating new ones.")
+    except Exception as e:
+        print(e, "Couldn't load KMeans Classifiers. Generating new ones.")
         clustering = True
 
 
@@ -410,10 +401,10 @@ def plot_equity_hist(equity_hist, player_cards=None, community_cards=None):
 
 # Post-Flop Abstraction using Equity Distributions
 def create_abstraction_folders():
-    if not os.path.exists("../data"):
-        for split in ["clusters", "raw"]:
-            for stage in ["flop", "turn", "river"]:
-                os.makedirs(f"../data/{split}/{stage}")
+    if not os.path.exists("../kmeans_data"):
+        for split in ["centroids", "cards", "distributions", "kmeans"]:
+            for stage in ["flop", "turn"]:
+                os.makedirs(f"../kmeans_data/{split}/{stage}")
 
 
 def generate_postflop_equity_distributions(
@@ -455,12 +446,14 @@ def generate_postflop_equity_distributions(
     if save:
         create_abstraction_folders()
         file_id = int(time.time())  # Use the time as the file_id
-        # TODO: Change to joblib saving for consistency everywhere
-        with open(f"../data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy", "wb") as f:
-            np.save(f, equity_distributions)
-        joblib.dump(
-            hands, f"../data/raw/{stage}/{file_id}_samples={n_samples}_bins={bins}"
-        )  # Store the list of hands, so you can associate a particular distribution with a particular hand
+        np.save(
+            f"../kmeans_data/distributions/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy",
+            equity_distributions,
+        )
+        np.save(
+            f"../kmeans_data/cards/{stage}/{file_id}_samples={n_samples}_bins={bins}.npy", hands
+        )
+        # Store the list of hands, so you can associate a particular distribution with a particular hand
 
 
 def predict_cluster_kmeans(kmeans_classifier, cards, n=200):
@@ -554,13 +547,9 @@ if __name__ == "__main__":
     if clustering:
         stages = ["flop", "turn"]
         for stage in stages:
-            raw_dataset_filenames = sorted(get_filenames(f"../data/raw/{stage}"))
-            # Take the most recently generated dataset to run our clustering on
-            filename = raw_dataset_filenames[-1]
-            print(filename)
-
-            equity_distributions = np.load(f"../data/raw/{stage}/{filename}")
-            if not os.path.exists(f"../data/clusters/{stage}/{filename}"):
+            filename = sorted(get_filenames(f"../kmeans_data/distributions/{stage}"))[-1]
+            equity_distributions = np.load(f"../kmeans_data/distributions/{stage}/{filename}")
+            if not os.path.exists(f"../kmeans_data/centroids/{stage}/centroids_{filename}"):
                 if stage == "flop":
                     kmeans = KMeans(NUM_FLOP_CLUSTERS)
                 elif stage == "turn":
@@ -568,6 +557,7 @@ if __name__ == "__main__":
 
                 kmeans.fit(equity_distributions)  # Perform Clustering
                 centroids = kmeans.cluster_centers_
-                joblib.dump(centroids, f"../data/clusters/{stage}/{filename}")
+                np.save(f"../kmeans_data/centroids/{stage}/centroids_{filename}", centroids)
+                joblib.dump(kmeans, f"../kmeans_data/kmeans/{stage}/kmeans_{filename.split('.')[0]}.joblib")
     else:  # Centroids have already been generated, just load them, which are tensors
         load_kmeans_classifiers()
