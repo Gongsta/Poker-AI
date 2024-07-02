@@ -4,5 +4,5 @@ treys # to validate that our own implementation of hand evaluation works, but ph
 joblib # parallel computation and store models
 phevaluator # fast poker hand evaluator using string representation of cards
 matplotlib
-scikit-learn
+scikit-learn==1.5.0
 py3-tts
